@@ -78,26 +78,7 @@ export default function TelegramFeed() {
   };
 
   if (error) {
-    return (
-      <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
-        <h3 className="text-red-400 font-semibold mb-2">Telegram Connection Error</h3>
-        <p className="text-red-300 text-sm mb-4">{error}</p>
-        <div className="text-xs text-red-200">
-          <p>To use Telegram integration, you need to:</p>
-          <ol className="list-decimal list-inside mt-2 space-y-1">
-            <li>Get API credentials from <a href="https://my.telegram.org/apps" target="_blank" rel="noopener noreferrer" className="underline">my.telegram.org/apps</a></li>
-            <li>Add them to your .env.local file</li>
-            <li>Complete the authentication process</li>
-          </ol>
-        </div>
-        <button 
-          onClick={fetchMessages}
-          className="mt-3 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return null;
   }
 
   return (

@@ -5,11 +5,27 @@ import { StringSession } from 'telegram/sessions';
 // You'll need to get these from https://my.telegram.org/apps
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '0');
 const API_HASH = process.env.TELEGRAM_API_HASH || '';
-const SESSION_STRING = process.env.TELEGRAM_SESSION || '';
+let SESSION_STRING = process.env.TELEGRAM_SESSION || '';
 
 let client: TelegramClient | null = null;
 
-async function initTelegramClient() {
+async function clearSession() {
+  if (client) {
+    try {
+      await client.disconnect();
+    } catch (error) {
+      console.log('Error disconnecting client:', error);
+    }
+    client = null;
+  }
+  SESSION_STRING = ''; // Clear the session string
+}
+
+async function initTelegramClient(forceReset = false) {
+  if (forceReset) {
+    await clearSession();
+  }
+  
   if (client) return client;
   
   try {
@@ -28,10 +44,39 @@ async function initTelegramClient() {
       onError: (err: Error) => console.error('Telegram auth error:', err),
     });
     
+    // Save the new session string (in a real app, you'd persist this to your database)
+    const savedSession = client.session.save();
+    SESSION_STRING = typeof savedSession === 'string' ? savedSession : '';
+    
     return client;
   } catch (error: unknown) {
     console.error('Failed to initialize Telegram client:', error);
+    
+    // If we get AUTH_KEY_DUPLICATED error, clear the session and throw
+    if (error && typeof error === 'object' && 'errorMessage' in error && 
+        (error as any).errorMessage === 'AUTH_KEY_DUPLICATED') {
+      await clearSession();
+      throw new Error('Session conflict detected. Please try resetting the session.');
+    }
+    
     throw error;
+  }
+}
+
+// Add a DELETE endpoint to reset the session
+export async function DELETE() {
+  try {
+    await clearSession();
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Telegram session cleared successfully' 
+    });
+  } catch (error: unknown) {
+    console.error('Error clearing session:', error);
+    return NextResponse.json(
+      { error: 'Failed to clear session' },
+      { status: 500 }
+    );
   }
 }
 
@@ -40,8 +85,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     const channelUsername = searchParams.get('channel') || 'mlmonchain';
+    const reset = searchParams.get('reset') === 'true';
     
-    const telegramClient = await initTelegramClient();
+    // Special action to reset session
+    if (action === 'reset') {
+      return DELETE();
+    }
+    
+    const telegramClient = await initTelegramClient(reset);
     
     switch (action) {
       case 'messages':
@@ -79,6 +130,19 @@ export async function GET(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Telegram API error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // If it's a session conflict, suggest resetting
+    if (errorMessage.includes('AUTH_KEY_DUPLICATED') || errorMessage.includes('Session conflict')) {
+      return NextResponse.json(
+        { 
+          error: 'Session conflict detected', 
+          details: errorMessage,
+          suggestion: 'Try resetting the session by calling DELETE /api/telegram or GET /api/telegram?action=reset'
+        },
+        { status: 409 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch Telegram data', details: errorMessage },
       { status: 500 }

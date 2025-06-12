@@ -31,7 +31,17 @@ export default function PriceChart({ symbol }: PriceChartProps) {
         timeVisible: true,
         secondsVisible: false,
         tickMarkFormatter: (time: Time) => {
-          const date = new Date(Number(time) * 1000);
+          // Handle both timestamp formats properly
+          const timestamp = typeof time === 'number' ? time : Number(time);
+          // If timestamp is in seconds, convert to milliseconds
+          const timeInMs = timestamp > 1e10 ? timestamp : timestamp * 1000;
+          const date = new Date(timeInMs);
+          
+          // Check if date is valid
+          if (isNaN(date.getTime())) {
+            return '00:00';
+          }
+          
           const hours = date.getHours().toString().padStart(2, '0');
           const minutes = date.getMinutes().toString().padStart(2, '0');
           return `${hours}:${minutes}`;
@@ -61,27 +71,64 @@ export default function PriceChart({ symbol }: PriceChartProps) {
           setError(data?.error || 'No data found for this symbol.');
           return;
         }
+        
+        if (data.length === 0) {
+          setError('No historical data available.');
+          return;
+        }
+        
         let formatted: CandlestickData[] = [];
         if (symbol.toUpperCase() === 'HYPE') {
           // Hyperliquid format: [{ T, c, h, l, o, t, ... }]
-          formatted = data.map((d: { t: number; o: string; h: string; l: string; c: string }) => ({
-            time: d.t / 1000 as Time,
-            open: parseFloat(d.o),
-            high: parseFloat(d.h),
-            low: parseFloat(d.l),
-            close: parseFloat(d.c),
-          }));
+          formatted = data.map((d: { t: number; o: string; h: string; l: string; c: string }) => {
+            const time = d.t / 1000; // Convert milliseconds to seconds
+            const open = parseFloat(d.o);
+            const high = parseFloat(d.h);
+            const low = parseFloat(d.l);
+            const close = parseFloat(d.c);
+            
+            // Validate the data
+            if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) {
+              return null;
+            }
+            
+            return {
+              time: time as Time,
+              open,
+              high,
+              low,
+              close,
+            };
+          }).filter(Boolean) as CandlestickData[]; // Remove null values
         } else {
           // Binance format: [[time, open, high, low, close, ...], ...]
-          formatted = data.map((d: [number, string, string, string, string]) => ({
-            time: d[0] / 1000 as Time,
-            open: parseFloat(d[1]),
-            high: parseFloat(d[2]),
-            low: parseFloat(d[3]),
-            close: parseFloat(d[4]),
-          }));
+          formatted = data.map((d: [number, string, string, string, string]) => {
+            const time = d[0] / 1000; // Convert milliseconds to seconds
+            const open = parseFloat(d[1]);
+            const high = parseFloat(d[2]);
+            const low = parseFloat(d[3]);
+            const close = parseFloat(d[4]);
+            
+            // Validate the data
+            if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) {
+              return null;
+            }
+            
+            return {
+              time: time as Time,
+              open,
+              high,
+              low,
+              close,
+            };
+          }).filter(Boolean) as CandlestickData[]; // Remove null values
         }
         
+        // Validate we have valid formatted data
+        if (formatted.length === 0) {
+          setError('No valid candle data available.');
+          return;
+        }
 
         candlestickSeries.setData(formatted);
         if (formatted.length > 0) {
@@ -115,7 +162,9 @@ export default function PriceChart({ symbol }: PriceChartProps) {
         // Fit the chart to show the latest data
         chart.timeScale().scrollToRealTime();
       })
-      .catch(() => setError('Failed to fetch historical data.'));
+      .catch((error) => {
+        setError('Failed to fetch historical data.');
+      });
 
     // WebSocket connection for real-time data
     let ws: WebSocket | null = null;
@@ -131,18 +180,27 @@ export default function PriceChart({ symbol }: PriceChartProps) {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.k) {
+        const time = data.k.t / 1000; // Convert milliseconds to seconds
+        const open = parseFloat(data.k.o);
+        const high = parseFloat(data.k.h);
+        const low = parseFloat(data.k.l);
+        const close = parseFloat(data.k.c);
+        
+        // Validate the real-time data
+        if (!isNaN(time) && !isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
           const candle: CandlestickData = {
-            time: data.k.t / 1000 as Time,
-          open: parseFloat(data.k.o),
-          high: parseFloat(data.k.h),
-          low: parseFloat(data.k.l),
-          close: parseFloat(data.k.c)
-        };
+            time: time as Time,
+            open,
+            high,
+            low,
+            close
+          };
           candlestickSeries.update(candle);
           setPrice(candle.close);
           setPriceChange(((candle.close - candle.open) / candle.open) * 100);
         }
-      };
+      }
+    };
     } else if (symbol.toUpperCase() === 'HYPE') {
       ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
       ws.onopen = () => {
@@ -158,18 +216,27 @@ export default function PriceChart({ symbol }: PriceChartProps) {
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.data && data.data.s === 'HYPE') {
-          const candle: CandlestickData = {
-            time: data.data.t / 1000 as Time,
-            open: parseFloat(data.data.o),
-            high: parseFloat(data.data.h),
-            low: parseFloat(data.data.l),
-            close: parseFloat(data.data.c)
-          };
-        candlestickSeries.update(candle);
-        setPrice(candle.close);
-        setPriceChange(((candle.close - candle.open) / candle.open) * 100);
-      }
-    };
+          const time = data.data.t / 1000; // Convert milliseconds to seconds
+          const open = parseFloat(data.data.o);
+          const high = parseFloat(data.data.h);
+          const low = parseFloat(data.data.l);
+          const close = parseFloat(data.data.c);
+          
+          // Validate the real-time data
+          if (!isNaN(time) && !isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
+            const candle: CandlestickData = {
+              time: time as Time,
+              open,
+              high,
+              low,
+              close
+            };
+            candlestickSeries.update(candle);
+            setPrice(candle.close);
+            setPriceChange(((candle.close - candle.open) / candle.open) * 100);
+          }
+        }
+      };
     }
 
     const handleResize = () => {

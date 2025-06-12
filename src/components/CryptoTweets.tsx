@@ -25,6 +25,11 @@ export default function CryptoTweets() {
   const [rateLimited, setRateLimited] = useState(false);
 
   const fetchTweets = async () => {
+    // Don't fetch if we have recent data (less than 5 minutes old)
+    if (lastUpdate && Date.now() - lastUpdate.getTime() < 5 * 60 * 1000) {
+      return;
+    }
+
     try {
       setError(null);
       const response = await fetch('/api/twitter');
@@ -44,7 +49,6 @@ export default function CryptoTweets() {
       setLastUpdate(new Date());
       setRateLimited(false);
     } catch (e) {
-      console.error('Error fetching tweets:', e);
       setError('Failed to load tweets from @TreeNewsFeed');
     } finally {
       setLoading(false);
@@ -52,7 +56,7 @@ export default function CryptoTweets() {
   };
 
   useEffect(() => {
-    // Only fetch on initial page load
+    // Only fetch on initial page load, no automatic polling
     fetchTweets();
   }, []);
 
