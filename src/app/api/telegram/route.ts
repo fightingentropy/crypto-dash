@@ -31,8 +31,19 @@ async function initTelegramClient(forceReset = false) {
   if (client) return client;
   if (clientInitPromise) return clientInitPromise;
 
-  if (!API_ID || !API_HASH || !SESSION_STRING) {
-    throw new Error('Telegram credentials not configured');
+  // Reload SESSION_STRING from env if it was cleared
+  if (!SESSION_STRING) {
+    SESSION_STRING = process.env.TELEGRAM_SESSION || '';
+  }
+
+  console.log('Telegram config check:', {
+    API_ID,
+    API_HASH_length: API_HASH?.length || 0,
+    SESSION_STRING_length: SESSION_STRING?.length || 0
+  });
+
+  if (!API_ID || !API_HASH) {
+    throw new Error('Telegram API_ID and API_HASH must be configured');
   }
 
   clientInitPromise = (async () => {
@@ -42,8 +53,13 @@ async function initTelegramClient(forceReset = false) {
         connectionRetries: 5,
       });
 
-      // Connect using the existing session without re-authenticating
+      // Connect
       await client.connect();
+
+      // If we don't have a session string, we need to authenticate
+      if (!SESSION_STRING) {
+        throw new Error('No session found. Please authenticate first by setting up your session string.');
+      }
 
       return client;
     } catch (error: unknown) {

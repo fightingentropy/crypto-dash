@@ -78,51 +78,27 @@ export default function PriceChart({ symbol }: PriceChartProps) {
         }
         
         let formatted: CandlestickData[] = [];
-        if (symbol.toUpperCase() === 'HYPE') {
-          // Hyperliquid format: [{ T, c, h, l, o, t, ... }]
-          formatted = data.map((d: { t: number; o: string; h: string; l: string; c: string }) => {
-            const time = d.t / 1000; // Convert milliseconds to seconds
-            const open = parseFloat(d.o);
-            const high = parseFloat(d.h);
-            const low = parseFloat(d.l);
-            const close = parseFloat(d.c);
-            
-            // Validate the data
-            if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) {
-              return null;
-            }
-            
-            return {
-              time: time as Time,
-              open,
-              high,
-              low,
-              close,
-            };
-          }).filter(Boolean) as CandlestickData[]; // Remove null values
-        } else {
-          // Binance format: [[time, open, high, low, close, ...], ...]
-          formatted = data.map((d: [number, string, string, string, string]) => {
-            const time = d[0] / 1000; // Convert milliseconds to seconds
-            const open = parseFloat(d[1]);
-            const high = parseFloat(d[2]);
-            const low = parseFloat(d[3]);
-            const close = parseFloat(d[4]);
-            
-            // Validate the data
-            if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) {
-              return null;
-            }
-            
-            return {
-              time: time as Time,
-              open,
-              high,
-              low,
-              close,
-            };
-          }).filter(Boolean) as CandlestickData[]; // Remove null values
-        }
+        // All symbols now use Hyperliquid format: [{ T, c, h, l, o, t, ... }]
+        formatted = data.map((d: { t: number; o: string; h: string; l: string; c: string }) => {
+          const time = d.t / 1000; // Convert milliseconds to seconds
+          const open = parseFloat(d.o);
+          const high = parseFloat(d.h);
+          const low = parseFloat(d.l);
+          const close = parseFloat(d.c);
+          
+          // Validate the data
+          if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) {
+            return null;
+          }
+          
+          return {
+            time: time as Time,
+            open,
+            high,
+            low,
+            close,
+          };
+        }).filter(Boolean) as CandlestickData[]; // Remove null values
         
         // Validate we have valid formatted data
         if (formatted.length === 0) {
@@ -166,42 +142,9 @@ export default function PriceChart({ symbol }: PriceChartProps) {
         setError('Failed to fetch historical data.');
       });
 
-    // WebSocket connection for real-time data
+    // WebSocket connection for real-time data - using Hyperliquid for all symbols
     let ws: WebSocket | null = null;
-    if (symbol.toUpperCase() === 'BTC') {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws');
-      ws.onopen = () => {
-        ws!.send(JSON.stringify({
-          method: 'SUBSCRIBE',
-          params: [`btcusdt@kline_1h`],
-          id: 1
-        }));
-      };
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.k) {
-          const time = data.k.t / 1000; // Convert milliseconds to seconds
-          const open = parseFloat(data.k.o);
-          const high = parseFloat(data.k.h);
-          const low = parseFloat(data.k.l);
-          const close = parseFloat(data.k.c);
-          
-          // Validate the real-time data
-          if (!isNaN(time) && !isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
-            const candle: CandlestickData = {
-              time: time as Time,
-              open,
-              high,
-              low,
-              close
-            };
-            candlestickSeries.update(candle);
-            setPrice(candle.close);
-            setPriceChange(((candle.close - candle.open) / candle.open) * 100);
-          }
-        }
-      };
-    } else if (symbol.toUpperCase() === 'HYPE') {
+    if (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'HYPE') {
       ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
       ws.onopen = () => {
         ws!.send(JSON.stringify({
