@@ -149,10 +149,10 @@ export default function PriceChart({ symbol }: PriceChartProps) {
             to: lastTime
           });
           
-          // Also set logical range to encourage more frequent labels
+          // Also set logical range to ensure the last 24 bars are visible
           chart.timeScale().setVisibleLogicalRange({
-            from: 0,
-            to: 24
+            from: Math.max(recentData.length - 24, 0),
+            to: recentData.length
           });
         } else {
           // Fit the chart to show the latest data
@@ -170,37 +170,37 @@ export default function PriceChart({ symbol }: PriceChartProps) {
     let ws: WebSocket | null = null;
     if (symbol.toUpperCase() === 'BTC') {
       ws = new WebSocket('wss://stream.binance.com:9443/ws');
-    ws.onopen = () => {
+      ws.onopen = () => {
         ws!.send(JSON.stringify({
-        method: 'SUBSCRIBE',
+          method: 'SUBSCRIBE',
           params: [`btcusdt@kline_1h`],
-        id: 1
-      }));
-    };
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.k) {
-        const time = data.k.t / 1000; // Convert milliseconds to seconds
-        const open = parseFloat(data.k.o);
-        const high = parseFloat(data.k.h);
-        const low = parseFloat(data.k.l);
-        const close = parseFloat(data.k.c);
-        
-        // Validate the real-time data
-        if (!isNaN(time) && !isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
-          const candle: CandlestickData = {
-            time: time as Time,
-            open,
-            high,
-            low,
-            close
-          };
-          candlestickSeries.update(candle);
-          setPrice(candle.close);
-          setPriceChange(((candle.close - candle.open) / candle.open) * 100);
+          id: 1
+        }));
+      };
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.k) {
+          const time = data.k.t / 1000; // Convert milliseconds to seconds
+          const open = parseFloat(data.k.o);
+          const high = parseFloat(data.k.h);
+          const low = parseFloat(data.k.l);
+          const close = parseFloat(data.k.c);
+          
+          // Validate the real-time data
+          if (!isNaN(time) && !isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
+            const candle: CandlestickData = {
+              time: time as Time,
+              open,
+              high,
+              low,
+              close
+            };
+            candlestickSeries.update(candle);
+            setPrice(candle.close);
+            setPriceChange(((candle.close - candle.open) / candle.open) * 100);
+          }
         }
-      }
-    };
+      };
     } else if (symbol.toUpperCase() === 'HYPE') {
       ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
       ws.onopen = () => {
@@ -208,14 +208,14 @@ export default function PriceChart({ symbol }: PriceChartProps) {
           method: 'subscribe',
           subscription: {
             type: 'candle',
-            coin: 'HYPE',
+            coin: symbol.toUpperCase(),
             interval: '1h'
           }
         }));
       };
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        if (data.data && data.data.s === 'HYPE') {
+        if (data.data && data.data.s === symbol.toUpperCase()) {
           const time = data.data.t / 1000; // Convert milliseconds to seconds
           const open = parseFloat(data.data.o);
           const high = parseFloat(data.data.h);

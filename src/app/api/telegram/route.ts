@@ -8,6 +8,7 @@ const API_HASH = process.env.TELEGRAM_API_HASH || '';
 let SESSION_STRING = process.env.TELEGRAM_SESSION || '';
 
 let client: TelegramClient | null = null;
+let clientInitPromise: Promise<TelegramClient> | null = null;
 
 async function clearSession() {
   if (client) {
@@ -18,6 +19,7 @@ async function clearSession() {
     }
     client = null;
   }
+  clientInitPromise = null;
   SESSION_STRING = ''; // Clear the session string
 }
 
@@ -27,40 +29,40 @@ async function initTelegramClient(forceReset = false) {
   }
   
   if (client) return client;
-  
-  try {
-    const session = new StringSession(SESSION_STRING);
-    client = new TelegramClient(session, API_ID, API_HASH, {
-      connectionRetries: 5,
-    });
-    
-    await client.start({
-      phoneNumber: async () => process.env.TELEGRAM_PHONE || '',
-      password: async () => process.env.TELEGRAM_PASSWORD || '',
-      phoneCode: async () => {
-        // In a real app, you'd need to implement a way to get the phone code
-        throw new Error('Phone code required - implement phone code input');
-      },
-      onError: (err: Error) => console.error('Telegram auth error:', err),
-    });
-    
-    // Save the new session string (in a real app, you'd persist this to your database)
-    const savedSession = client.session.save();
-    SESSION_STRING = typeof savedSession === 'string' ? savedSession : '';
-    
-    return client;
-  } catch (error: unknown) {
-    console.error('Failed to initialize Telegram client:', error);
-    
-    // If we get AUTH_KEY_DUPLICATED error, clear the session and throw
-    if (error && typeof error === 'object' && 'errorMessage' in error && 
-        (error as any).errorMessage === 'AUTH_KEY_DUPLICATED') {
-      await clearSession();
-      throw new Error('Session conflict detected. Please try resetting the session.');
-    }
-    
-    throw error;
+  if (clientInitPromise) return clientInitPromise;
+
+  if (!API_ID || !API_HASH || !SESSION_STRING) {
+    throw new Error('Telegram credentials not configured');
   }
+
+  clientInitPromise = (async () => {
+    try {
+      const session = new StringSession(SESSION_STRING);
+      client = new TelegramClient(session, API_ID, API_HASH, {
+        connectionRetries: 5,
+      });
+
+      // Connect using the existing session without re-authenticating
+      await client.connect();
+
+      return client;
+    } catch (error: unknown) {
+      console.error('Failed to initialize Telegram client:', error);
+      
+      // If we get AUTH_KEY_DUPLICATED error, clear the session and throw
+      if (error && typeof error === 'object' && 'errorMessage' in error && 
+          (error as any).errorMessage === 'AUTH_KEY_DUPLICATED') {
+        await clearSession();
+        throw new Error('Session conflict detected. Please try resetting the session.');
+      }
+      
+      client = null;
+      clientInitPromise = null;
+      throw error;
+    }
+  })();
+
+  return clientInitPromise;
 }
 
 // Add a DELETE endpoint to reset the session

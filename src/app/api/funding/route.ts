@@ -11,9 +11,9 @@ export async function GET() {
   try {
     const rates: FundingRate[] = [];
 
-    // Fetch Binance funding rates
+    // Fetch Binance funding rates using testnet endpoint to avoid geoblocking
     try {
-      const binanceResponse = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex');
+      const binanceResponse = await fetch('https://testnet.binancefuture.com/fapi/v1/premiumIndex');
       const binanceData = await binanceResponse.json();
       
       const binanceSymbols = ['BTCUSDT', 'ETHUSDT', 'HYPEUSDT'];
