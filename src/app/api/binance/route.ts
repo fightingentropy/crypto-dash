@@ -7,8 +7,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing symbol' }, { status: 400 });
   }
 
-  // If symbol is HYPE, fetch from Hyperliquid
-  if (symbol.toUpperCase() === 'HYPE') {
+  // If symbol is HYPE or BTC, fetch from Hyperliquid
+  if (symbol.toUpperCase() === 'HYPE' || symbol.toUpperCase() === 'BTC') {
     // Hyperliquid API for historical candles using POST to /info endpoint
     const url = `https://api.hyperliquid.xyz/info`;
     const endTime = Date.now();
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         body: JSON.stringify({
           type: 'candleSnapshot',
           req: {
-            coin: 'HYPE',
+            coin: symbol.toUpperCase(),
             interval: '1h',
             startTime: startTime,
             endTime: endTime
@@ -44,8 +44,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Otherwise, fetch from Binance spot
-  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}USDT&interval=1h&limit=1000`;
+  // Otherwise, fetch from Binance spot using the public data API (avoids geoblocks)
+  const url = `https://data-api.binance.vision/api/v3/klines?symbol=${symbol.toUpperCase()}USDT&interval=1h&limit=1000`;
   try {
     const res = await fetch(url);
     if (!res.ok) {
