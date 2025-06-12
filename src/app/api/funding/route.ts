@@ -11,62 +11,60 @@ export async function GET() {
   try {
     const rates: FundingRate[] = [];
 
-    // Fetch Binance funding rates using testnet endpoint to avoid geoblocking
+    // Fetch real Binance funding rates from Hyperliquid API
     try {
-      const binanceResponse = await fetch('https://testnet.binancefuture.com/fapi/v1/premiumIndex');
-      const binanceData = await binanceResponse.json();
-      
-      const binanceSymbols = ['BTCUSDT', 'ETHUSDT', 'HYPEUSDT'];
-      binanceSymbols.forEach(symbol => {
-        const data = binanceData.find((item: { symbol: string }) => item.symbol === symbol);
-        if (data) {
-          // Funding is every 1 hour, so 24 times per day, 8760 times per year
-          const annualizedAPR = (parseFloat(data.lastFundingRate) * 8760 * 100).toFixed(2);
-          rates.push({
-            symbol: symbol.replace('USDT', ''),
-            rate: annualizedAPR,
-            nextFundingTime: data.nextFundingTime,
-            exchange: 'Binance'
-          });
-        }
-      });
-    } catch (e) {
-      console.error('Binance funding rates error:', e);
-    }
-
-    // Fetch Hyperliquid funding rates
-    try {
-      const hyperliquidResponse = await fetch('https://api.hyperliquid.xyz/info', {
+      const hyperliquidResponse = await fetch('https://api-ui.hyperliquid.xyz/info', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          type: 'metaAndAssetCtxs'
+          type: 'predictedFundings'
         })
       });
       const hyperliquidData = await hyperliquidResponse.json();
       
-      if (hyperliquidData && hyperliquidData.length >= 2) {
-        const [, assetCtxs] = hyperliquidData;
+      if (Array.isArray(hyperliquidData)) {
+        const targetSymbols = ['BTC', 'ETH', 'HYPE'];
         
-        ['BTC', 'ETH', 'HYPE'].forEach((symbol, index) => {
-          const assetData = assetCtxs[index];
-          if (assetData && assetData.funding !== undefined) {
-            // Funding is every 1 hour, so 24 times per day, 8760 times per year
-            const annualizedAPR = (parseFloat(assetData.funding) * 8760 * 100).toFixed(2);
-            rates.push({
-              symbol,
-              rate: annualizedAPR,
-              nextFundingTime: Date.now() + (1 * 60 * 60 * 1000), // Funding every 1 hour
-              exchange: 'Hyperliquid'
-            });
+        targetSymbols.forEach(symbol => {
+          const symbolData = hyperliquidData.find(([sym]) => sym === symbol);
+          if (symbolData && symbolData[1]) {
+            const exchanges = symbolData[1];
+            
+                         // Get Binance data
+             const binanceData = exchanges.find(([exchange]: [string, any]) => exchange === 'BinPerp');
+             if (binanceData && binanceData[1] && binanceData[1].fundingRate) {
+               // Binance funding is every 8 hours, so 3 times per day, 1095 times per year
+               const annualizedAPR = (parseFloat(binanceData[1].fundingRate) * 1095 * 100).toFixed(2);
+               rates.push({
+                 symbol,
+                 rate: annualizedAPR,
+                 nextFundingTime: binanceData[1].nextFundingTime,
+                 exchange: 'Binance'
+               });
+             }
+             
+             // Get Hyperliquid data
+             const hlData = exchanges.find(([exchange]: [string, any]) => exchange === 'HlPerp');
+             if (hlData && hlData[1] && hlData[1].fundingRate) {
+               // Hyperliquid funding is every 1 hour, so 24 times per day, 8760 times per year
+               const annualizedAPR = (parseFloat(hlData[1].fundingRate) * 8760 * 100).toFixed(2);
+               rates.push({
+                 symbol,
+                 rate: annualizedAPR,
+                 nextFundingTime: hlData[1].nextFundingTime,
+                 exchange: 'Hyperliquid'
+               });
+             }
           }
         });
       }
     } catch (e) {
       console.error('Hyperliquid funding rates error:', e);
     }
+
+
 
     return NextResponse.json(rates);
   } catch (error) {
