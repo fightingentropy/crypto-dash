@@ -30,8 +30,8 @@ export default function PriceChart({ symbol }: PriceChartProps) {
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
-        tickMarkFormatter: (time: any) => {
-          const date = new Date(time * 1000);
+        tickMarkFormatter: (time: Time) => {
+          const date = new Date(Number(time) * 1000);
           const hours = date.getHours().toString().padStart(2, '0');
           const minutes = date.getMinutes().toString().padStart(2, '0');
           return `${hours}:${minutes}`;
@@ -64,7 +64,7 @@ export default function PriceChart({ symbol }: PriceChartProps) {
         let formatted: CandlestickData[] = [];
         if (symbol.toUpperCase() === 'HYPE') {
           // Hyperliquid format: [{ T, c, h, l, o, t, ... }]
-          formatted = data.map((d: any) => ({
+          formatted = data.map((d: { t: number; o: string; h: string; l: string; c: string }) => ({
             time: d.t / 1000 as Time,
             open: parseFloat(d.o),
             high: parseFloat(d.h),
@@ -73,7 +73,7 @@ export default function PriceChart({ symbol }: PriceChartProps) {
           }));
         } else {
           // Binance format: [[time, open, high, low, close, ...], ...]
-          formatted = data.map((d: any) => ({
+          formatted = data.map((d: [number, string, string, string, string]) => ({
             time: d[0] / 1000 as Time,
             open: parseFloat(d[1]),
             high: parseFloat(d[2]),
@@ -82,12 +82,7 @@ export default function PriceChart({ symbol }: PriceChartProps) {
           }));
         }
         
-        // Debug: Log first and last timestamps
-        if (formatted.length > 0) {
-          console.log('First candle time:', new Date(Number(formatted[0].time) * 1000));
-          console.log('Last candle time:', new Date(Number(formatted[formatted.length - 1].time) * 1000));
-          console.log('Total candles:', formatted.length);
-        }
+
         candlestickSeries.setData(formatted);
         if (formatted.length > 0) {
           setPrice(formatted[formatted.length - 1].close);
@@ -126,23 +121,23 @@ export default function PriceChart({ symbol }: PriceChartProps) {
     let ws: WebSocket | null = null;
     if (symbol.toUpperCase() === 'BTC') {
       ws = new WebSocket('wss://stream.binance.com:9443/ws');
-      ws.onopen = () => {
+    ws.onopen = () => {
         ws!.send(JSON.stringify({
-          method: 'SUBSCRIBE',
+        method: 'SUBSCRIBE',
           params: [`btcusdt@kline_1h`],
-          id: 1
-        }));
-      };
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.k) {
+        id: 1
+      }));
+    };
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.k) {
           const candle: CandlestickData = {
             time: data.k.t / 1000 as Time,
-            open: parseFloat(data.k.o),
-            high: parseFloat(data.k.h),
-            low: parseFloat(data.k.l),
-            close: parseFloat(data.k.c)
-          };
+          open: parseFloat(data.k.o),
+          high: parseFloat(data.k.h),
+          low: parseFloat(data.k.l),
+          close: parseFloat(data.k.c)
+        };
           candlestickSeries.update(candle);
           setPrice(candle.close);
           setPriceChange(((candle.close - candle.open) / candle.open) * 100);
@@ -170,11 +165,11 @@ export default function PriceChart({ symbol }: PriceChartProps) {
             low: parseFloat(data.data.l),
             close: parseFloat(data.data.c)
           };
-          candlestickSeries.update(candle);
-          setPrice(candle.close);
-          setPriceChange(((candle.close - candle.open) / candle.open) * 100);
-        }
-      };
+        candlestickSeries.update(candle);
+        setPrice(candle.close);
+        setPriceChange(((candle.close - candle.open) / candle.open) * 100);
+      }
+    };
     }
 
     const handleResize = () => {
@@ -209,7 +204,7 @@ export default function PriceChart({ symbol }: PriceChartProps) {
       {error ? (
         <div className="text-red-400 text-center py-8">{error}</div>
       ) : (
-        <div ref={chartContainerRef} className="w-full" />
+      <div ref={chartContainerRef} className="w-full" />
       )}
     </div>
   );

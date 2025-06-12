@@ -15,7 +15,6 @@ export async function GET() {
     });
 
     if (userResponse.status === 429) {
-      console.log('Twitter API rate limit exceeded');
       return NextResponse.json({ 
         error: 'Twitter API rate limit exceeded. Please try again later.',
         rateLimited: true 
@@ -45,7 +44,6 @@ export async function GET() {
     });
 
     if (tweetsResponse.status === 429) {
-      console.log('Twitter API rate limit exceeded on tweets endpoint');
       return NextResponse.json({ 
         error: 'Twitter API rate limit exceeded. Please try again later.',
         rateLimited: true 
@@ -61,7 +59,16 @@ export async function GET() {
     const tweetsData = await tweetsResponse.json();
     
     // Transform Twitter data to our news format
-    const tweets = tweetsData.data?.map((tweet: any) => ({
+    const tweets = tweetsData.data?.map((tweet: { 
+      id: string; 
+      text: string; 
+      created_at: string; 
+      public_metrics?: { 
+        retweet_count: number; 
+        like_count: number; 
+        reply_count: number; 
+      }; 
+    }) => ({
       id: tweet.id,
       title: tweet.text.length > 100 ? tweet.text.substring(0, 100) + '...' : tweet.text,
       summary: tweet.text,
@@ -76,7 +83,6 @@ export async function GET() {
       }
     })) || [];
 
-    console.log(`Successfully fetched ${tweets.length} tweets from @TreeNewsFeed`);
     return NextResponse.json(tweets);
   } catch (error) {
     console.error('Error fetching Twitter data:', error);

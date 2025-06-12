@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 
+interface FundingRate {
+  symbol: string;
+  rate: string;
+  nextFundingTime: number;
+  exchange: string;
+}
+
 export async function GET() {
   try {
-    const rates: any[] = [];
+    const rates: FundingRate[] = [];
 
     // Fetch Binance funding rates
     try {
@@ -11,7 +18,7 @@ export async function GET() {
       
       const binanceSymbols = ['BTCUSDT', 'ETHUSDT', 'HYPEUSDT'];
       binanceSymbols.forEach(symbol => {
-        const data = binanceData.find((item: any) => item.symbol === symbol);
+        const data = binanceData.find((item: { symbol: string }) => item.symbol === symbol);
         if (data) {
           // Funding is every 1 hour, so 24 times per day, 8760 times per year
           const annualizedAPR = (parseFloat(data.lastFundingRate) * 8760 * 100).toFixed(2);
@@ -41,7 +48,7 @@ export async function GET() {
       const hyperliquidData = await hyperliquidResponse.json();
       
       if (hyperliquidData && hyperliquidData.length >= 2) {
-        const [meta, assetCtxs] = hyperliquidData;
+        const [, assetCtxs] = hyperliquidData;
         
         ['BTC', 'ETH', 'HYPE'].forEach((symbol, index) => {
           const assetData = assetCtxs[index];

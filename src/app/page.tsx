@@ -2,7 +2,8 @@
 
 import PriceChart from '@/components/PriceChart';
 import FundingRates from '@/components/FundingRates';
-import CryptoNews from '@/components/CryptoNews';
+import CryptoTweets from '@/components/CryptoTweets';
+import TelegramFeed from '@/components/TelegramFeed';
 
 export default function Home() {
   return (
@@ -14,7 +15,8 @@ export default function Home() {
           <PriceChart symbol="HYPE" />
         </div>
         <FundingRates />
-        <CryptoNews />
+        <TelegramFeed />
+        <CryptoTweets />
       </div>
     </main>
   );
