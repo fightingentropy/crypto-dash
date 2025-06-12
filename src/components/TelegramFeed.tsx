@@ -87,56 +87,63 @@ export default function TelegramFeed() {
   }
 
   return (
-    <div className="bg-[#181A20] border border-gray-700 rounded-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-[#F0F3FA] mb-2">
-            {channelInfo ? `@${channelInfo.username}` : '@mlmonchain'}
-          </h2>
-          {channelInfo && (
-            <div className="text-sm text-gray-400">
-              <p className="font-medium text-[#F0F3FA]">{channelInfo.title}</p>
-              {channelInfo.participantsCount && channelInfo.participantsCount > 0 && (
-                <p>{channelInfo.participantsCount.toLocaleString()} subscribers</p>
-              )}
-              {channelInfo.about && <p className="mt-1 text-xs">{channelInfo.about}</p>}
-            </div>
-          )}
-        </div>
+    <div className="bg-[#181A20] border border-gray-700 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-[#F0F3FA]">
+          {channelInfo ? `@${channelInfo.username}` : '@mlmonchain'}
+        </h2>
         <div className="flex items-center gap-2">
-          <label htmlFor="limit" className="text-sm text-gray-400">Show:</label>
           <select
-            id="limit"
             value={limit}
             onChange={(e) => setLimit(parseInt(e.target.value))}
-            className="bg-gray-800 border border-gray-600 text-[#F0F3FA] text-sm rounded px-2 py-1"
+            className="bg-gray-800 border border-gray-600 text-[#F0F3FA] text-xs rounded px-2 py-1"
           >
-            <option value={5}>5 messages</option>
-            <option value={10}>10 messages</option>
-            <option value={20}>20 messages</option>
-            <option value={50}>50 messages</option>
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
           </select>
+          <button
+            onClick={fetchMessages}
+            disabled={loading}
+            className="text-gray-400 hover:text-[#F0F3FA] disabled:text-gray-600 transition-colors"
+            title="Refresh messages"
+          >
+            <svg
+              className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F0F3FA]"></div>
-          <span className="ml-3 text-gray-400">Loading messages...</span>
+        <div className="flex items-center justify-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#F0F3FA]"></div>
+          <span className="ml-2 text-gray-400 text-sm">Loading...</span>
         </div>
       ) : (
-        <div className="space-y-4 max-h-96 overflow-y-auto">
+        <div className="space-y-3 max-h-80 overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-gray-400 text-center py-4">No messages found</p>
+            <p className="text-gray-400 text-center py-3 text-sm">No messages found</p>
           ) : (
             messages.map((message) => (
               <div
                 key={message.id}
-                className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:bg-gray-800/70 transition-colors"
+                className="bg-gray-800/50 border border-gray-700 rounded p-3 hover:bg-gray-800/70 transition-colors"
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="text-xs text-gray-400">
-                    Message #{message.id} • {formatDate(message.date)}
+                <div className="flex justify-between items-start mb-1">
+                  <div className="text-xs text-gray-500">
+                    #{message.id} • {formatDate(message.date)}
                   </div>
                   {message.views && (
                     <div className="text-xs text-gray-500">
@@ -153,15 +160,7 @@ export default function TelegramFeed() {
         </div>
       )}
 
-      <div className="mt-4 pt-4 border-t border-gray-700">
-        <button
-          onClick={fetchMessages}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm rounded transition-colors"
-        >
-          {loading ? 'Refreshing...' : 'Refresh Messages'}
-        </button>
-      </div>
+
     </div>
   );
 } 
