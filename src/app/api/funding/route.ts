@@ -59,12 +59,12 @@ export async function GET() {
             if (hlData && hlData[1] && hlData[1].fundingRate) {
               // Hyperliquid funding is every 1 hour, so 24 times per day, 8760 times per year
               const annualizedAPR = (parseFloat(hlData[1].fundingRate) * 8760 * 100).toFixed(2);
-              rates.push({
-                symbol,
-                rate: annualizedAPR,
+            rates.push({
+              symbol,
+              rate: annualizedAPR,
                 nextFundingTime: hlData[1].nextFundingTime,
-                exchange: 'Hyperliquid'
-              });
+              exchange: 'Hyperliquid'
+            });
             }
           }
         });

@@ -90,8 +90,8 @@ export default function TelegramFeed() {
     <div className="bg-[#181A20] border border-gray-700 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-bold text-[#F0F3FA]">
-          {channelInfo ? `@${channelInfo.username}` : '@mlmonchain'}
-        </h2>
+            {channelInfo ? `@${channelInfo.username}` : '@mlmonchain'}
+          </h2>
         <div className="flex items-center gap-2">
           <select
             value={limit}
