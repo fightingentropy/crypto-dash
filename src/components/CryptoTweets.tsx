@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface NewsItem {
   id: string;
@@ -24,7 +24,7 @@ export default function CryptoTweets() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [rateLimited, setRateLimited] = useState(false);
 
-  const fetchTweets = async () => {
+  const fetchTweets = useCallback(async () => {
     // Don't fetch if we have recent data (less than 5 minutes old)
     if (lastUpdate && Date.now() - lastUpdate.getTime() < 5 * 60 * 1000) {
       return;
@@ -48,17 +48,17 @@ export default function CryptoTweets() {
       setTweets(tweetsData);
       setLastUpdate(new Date());
       setRateLimited(false);
-    } catch (e) {
+    } catch {
       setError('Failed to load tweets from @TreeNewsFeed');
     } finally {
       setLoading(false);
     }
-  };
+  }, [lastUpdate]);
 
   useEffect(() => {
     // Only fetch on initial page load, no automatic polling
     fetchTweets();
-  }, []);
+  }, [fetchTweets]);
 
   // Hide component completely if rate limited
   if (rateLimited) {

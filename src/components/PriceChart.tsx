@@ -138,7 +138,7 @@ export default function PriceChart({ symbol }: PriceChartProps) {
         // Fit the chart to show the latest data
         chart.timeScale().scrollToRealTime();
       })
-      .catch((error) => {
+      .catch(() => {
         setError('Failed to fetch historical data.');
       });
 
