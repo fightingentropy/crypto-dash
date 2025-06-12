@@ -96,7 +96,9 @@ export default function TelegramFeed() {
           {channelInfo && (
             <div className="text-sm text-gray-400">
               <p className="font-medium text-[#F0F3FA]">{channelInfo.title}</p>
-              <p>{channelInfo.participantsCount?.toLocaleString()} subscribers</p>
+              {channelInfo.participantsCount && channelInfo.participantsCount > 0 && (
+                <p>{channelInfo.participantsCount.toLocaleString()} subscribers</p>
+              )}
               {channelInfo.about && <p className="mt-1 text-xs">{channelInfo.about}</p>}
             </div>
           )}
