@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import PriceChart from '@/components/PriceChart';
 import FundingRates from '@/components/FundingRates';
 import CryptoTweets from '@/components/CryptoTweets';
 import TelegramFeed from '@/components/TelegramFeed';
 
 export default function Home() {
-  const [_hypePrice, setHypePrice] = useState<string | null>(null);
-
   useEffect(() => {
     const fetchHypePrice = async () => {
       try {
@@ -24,7 +22,6 @@ export default function Home() {
         const data = await response.json();
         if (data.HYPE) {
           const price = parseFloat(data.HYPE).toFixed(2);
-          setHypePrice(price);
           document.title = `$${price} HYPE - Crypto Dashboard`;
         }
       } catch (error) {
