@@ -49,7 +49,7 @@ export default function TelegramFeed() {
       if (response.ok) {
         // API returns an array directly, not { messages: [...] }
         const messagesArray = Array.isArray(data) ? data : data.messages || [];
-        setMessages(messagesArray.map((msg: any) => ({
+        setMessages(messagesArray.map((msg: { id: number; message?: string; date: number; sender?: string; views?: number }) => ({
           id: msg.id,
           text: msg.message || '',
           date: new Date(msg.date * 1000), // Convert Unix timestamp to Date
@@ -60,7 +60,7 @@ export default function TelegramFeed() {
       } else {
         setError(data.error || 'Failed to fetch messages');
       }
-    } catch (err) {
+    } catch {
       setError('Network error fetching messages');
     } finally {
       setLoading(false);
