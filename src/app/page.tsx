@@ -7,7 +7,7 @@ import CryptoTweets from '@/components/CryptoTweets';
 import TelegramFeed from '@/components/TelegramFeed';
 
 export default function Home() {
-  const [hypePrice, setHypePrice] = useState<string | null>(null);
+  const [_hypePrice, setHypePrice] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchHypePrice = async () => {
