@@ -102,10 +102,10 @@ export default function PriceChart({ symbol }: PriceChartProps) {
             to: lastTime
           });
           
-          // Also set logical range to encourage more frequent labels
+          // Also set logical range to ensure the last 24 bars are visible
           chart.timeScale().setVisibleLogicalRange({
-            from: 0,
-            to: 24
+            from: Math.max(recentData.length - 24, 0),
+            to: recentData.length
           });
         } else {
           // Fit the chart to show the latest data
