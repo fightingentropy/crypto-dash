@@ -88,8 +88,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Default: Get recent posts
+    const limit = parseInt(searchParams.get('limit') || '10');
     const entity = await client.getEntity(channel);
-    const messages = await client.getMessages(entity, { limit: 10 });
+    const messages = await client.getMessages(entity, { limit });
     
     const posts = (messages as unknown as TelegramMessage[]).map(msg => ({
       id: msg.id,

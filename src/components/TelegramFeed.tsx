@@ -47,15 +47,20 @@ export default function TelegramFeed() {
       const data = await response.json();
       
       if (response.ok) {
-        setMessages(data.messages.map((msg: TelegramMessage & { date: number }) => ({
-          ...msg,
+        // API returns an array directly, not { messages: [...] }
+        const messagesArray = Array.isArray(data) ? data : data.messages || [];
+        setMessages(messagesArray.map((msg: any) => ({
+          id: msg.id,
+          text: msg.message || '',
           date: new Date(msg.date * 1000), // Convert Unix timestamp to Date
+          sender: msg.sender || 'Channel',
+          views: msg.views || 0
         })));
         setError(null);
       } else {
         setError(data.error || 'Failed to fetch messages');
       }
-    } catch {
+    } catch (err) {
       setError('Network error fetching messages');
     } finally {
       setLoading(false);
