@@ -50,16 +50,31 @@ async function authenticate() {
 
     console.log('✅ Authentication successful!');
     const sessionString = client.session.save();
-    console.log('\n🔑 Your session string:');
-    console.log(sessionString);
-    console.log('\n📝 Add this to your .env.local file:');
-    console.log(`TELEGRAM_SESSION=${sessionString}`);
     
+    console.log('\n' + '='.repeat(80));
+    console.log('🎉 SUCCESS! Your Telegram session string:');
+    console.log('='.repeat(80));
+    console.log(sessionString);
+    console.log('='.repeat(80));
+    console.log('\n📋 Next steps:');
+    console.log('1. Copy the session string above');
+    console.log('2. Update your .env.local file: TELEGRAM_SESSION=<session_string>');
+    console.log('3. For Vercel deployment:');
+    console.log('   - Go to your Vercel project dashboard');
+    console.log('   - Navigate to Settings > Environment Variables');
+    console.log('   - Add these variables:');
+    console.log('     • TELEGRAM_API_ID=' + API_ID);
+    console.log('     • TELEGRAM_API_HASH=' + API_HASH);
+    console.log('     • TELEGRAM_SESSION=<session_string>');
+    console.log('4. Redeploy your application');
+    console.log('\n⚠️  IMPORTANT: Keep this session string secure and private!');
+    
+    await client.disconnect();
+    process.exit(0);
   } catch (error) {
     console.error('❌ Authentication failed:', error);
-  } finally {
     await client.disconnect();
-    rl.close();
+    process.exit(1);
   }
 }
 

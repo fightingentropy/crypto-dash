@@ -5,167 +5,114 @@ import { StringSession } from 'telegram/sessions';
 // You'll need to get these from https://my.telegram.org/apps
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '0');
 const API_HASH = process.env.TELEGRAM_API_HASH || '';
-let SESSION_STRING = process.env.TELEGRAM_SESSION || '';
+const SESSION_STRING = process.env.TELEGRAM_SESSION || '';
 
-let client: TelegramClient | null = null;
-let clientInitPromise: Promise<TelegramClient> | null = null;
-
-async function clearSession() {
-  if (client) {
-    try {
-      await client.disconnect();
-    } catch (error) {
-      console.log('Error disconnecting client:', error);
-    }
-    client = null;
-  }
-  clientInitPromise = null;
-  SESSION_STRING = ''; // Clear the session string
-}
-
-async function initTelegramClient(forceReset = false) {
-  if (forceReset) {
-    await clearSession();
-  }
-  
-  if (client) return client;
-  if (clientInitPromise) return clientInitPromise;
-
-  // Reload SESSION_STRING from env if it was cleared
-  if (!SESSION_STRING) {
-    SESSION_STRING = process.env.TELEGRAM_SESSION || '';
+async function createTelegramClient() {
+  if (!API_ID || !API_HASH || !SESSION_STRING) {
+    throw new Error('Telegram credentials not configured. Please set TELEGRAM_API_ID, TELEGRAM_API_HASH, and TELEGRAM_SESSION environment variables.');
   }
 
-  console.log('Telegram config check:', {
-    API_ID,
-    API_HASH_length: API_HASH?.length || 0,
-    SESSION_STRING_length: SESSION_STRING?.length || 0
+  const session = new StringSession(SESSION_STRING);
+  const client = new TelegramClient(session, API_ID, API_HASH, {
+    connectionRetries: 3,
+    requestRetries: 2,
   });
 
-  if (!API_ID || !API_HASH) {
-    throw new Error('Telegram API_ID and API_HASH must be configured');
-  }
-
-  clientInitPromise = (async () => {
-    try {
-      const session = new StringSession(SESSION_STRING);
-      client = new TelegramClient(session, API_ID, API_HASH, {
-        connectionRetries: 5,
-      });
-
-      // Connect
-      await client.connect();
-
-      // If we don't have a session string, we need to authenticate
-      if (!SESSION_STRING) {
-        throw new Error('No session found. Please authenticate first by setting up your session string.');
-      }
-
-      return client;
-    } catch (error: unknown) {
-      console.error('Failed to initialize Telegram client:', error);
-      
-      // If we get AUTH_KEY_DUPLICATED error, clear the session and throw
-      if (error && typeof error === 'object' && 'errorMessage' in error && 
-          (error as any).errorMessage === 'AUTH_KEY_DUPLICATED') {
-        await clearSession();
-        throw new Error('Session conflict detected. Please try resetting the session.');
-      }
-      
-      client = null;
-      clientInitPromise = null;
-      throw error;
-    }
-  })();
-
-  return clientInitPromise;
-}
-
-// Add a DELETE endpoint to reset the session
-export async function DELETE() {
   try {
-    await clearSession();
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Telegram session cleared successfully' 
-    });
+    await client.connect();
+    
+    // Verify the session is still valid
+    if (!await client.checkAuthorization()) {
+      await client.disconnect();
+      throw new Error('Session expired. Please regenerate your session string.');
+    }
+    
+    return client;
   } catch (error: unknown) {
-    console.error('Error clearing session:', error);
-    return NextResponse.json(
-      { error: 'Failed to clear session' },
-      { status: 500 }
-    );
+    try {
+      await client.disconnect();
+    } catch (disconnectError) {
+      // Ignore disconnect errors
+    }
+    
+    if (error instanceof Error && 
+        (error.message.includes('AUTH_KEY_DUPLICATED') || 
+         (error as any).errorMessage === 'AUTH_KEY_DUPLICATED')) {
+      throw new Error('Session conflict detected. Please regenerate your session string using the authentication script.');
+    }
+    
+    throw error;
   }
 }
 
 export async function GET(request: NextRequest) {
+  let client: TelegramClient | null = null;
+  
   try {
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
-    const channelUsername = searchParams.get('channel') || 'mlmonchain';
-    const reset = searchParams.get('reset') === 'true';
+    const action = searchParams.get('action') || 'posts';
+    const channel = searchParams.get('channel') || 'mlmonchain';
     
-    // Special action to reset session
     if (action === 'reset') {
-      return DELETE();
+      return NextResponse.json({ 
+        message: 'For serverless deployment, please regenerate your session string using the authentication script and update your environment variables.' 
+      });
     }
-    
-    const telegramClient = await initTelegramClient(reset);
-    
-    switch (action) {
-      case 'messages':
-        const limit = parseInt(searchParams.get('limit') || '10');
-        const messages = await telegramClient.getMessages(channelUsername, {
-          limit,
-        });
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const formattedMessages = messages.map((msg: any) => ({
-          id: msg.id,
-          text: msg.message,
-          date: msg.date,
-          sender: msg.senderId?.toString() || '',
-          views: msg.views,
-        }));
-        
-        return NextResponse.json({ messages: formattedMessages });
-        
-      case 'channel_info':
-        const entity = await telegramClient.getEntity(channelUsername);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const entityData = entity as any;
-        return NextResponse.json({
-          id: entityData.id?.toString() || '',
-          title: entityData.title || '',
-          username: entityData.username || '',
-          participantsCount: entityData.participantsCount || 0,
-          about: entityData.about || '',
-        });
-        
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+
+    client = await createTelegramClient();
+
+    if (action === 'channel_info') {
+      const entity = await client.getEntity(channel);
+      return NextResponse.json({
+        id: entity.id?.toString(),
+        title: (entity as any).title || '',
+        username: (entity as any).username || '',
+        participantsCount: (entity as any).participantsCount || 0,
+        about: (entity as any).about || ''
+      });
     }
+
+    // Default: Get recent posts
+    const entity = await client.getEntity(channel);
+    const messages = await client.getMessages(entity, { limit: 10 });
+    
+    const posts = messages.map(msg => ({
+      id: msg.id,
+      message: msg.message || '',
+      date: msg.date,
+      views: (msg as any).views || 0
+    }));
+
+    return NextResponse.json(posts);
+    
   } catch (error: unknown) {
     console.error('Telegram API error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // If it's a session conflict, suggest resetting
-    if (errorMessage.includes('AUTH_KEY_DUPLICATED') || errorMessage.includes('Session conflict')) {
-      return NextResponse.json(
-        { 
-          error: 'Session conflict detected', 
-          details: errorMessage,
-          suggestion: 'Try resetting the session by calling DELETE /api/telegram or GET /api/telegram?action=reset'
-        },
-        { status: 409 }
-      );
+    let errorMessage = 'Failed to fetch Telegram data';
+    if (error instanceof Error) {
+      errorMessage = error.message;
     }
     
     return NextResponse.json(
-      { error: 'Failed to fetch Telegram data', details: errorMessage },
+      { error: errorMessage },
       { status: 500 }
     );
+  } finally {
+    // Always disconnect the client in serverless environment
+    if (client) {
+      try {
+        await client.disconnect();
+      } catch (error) {
+        // Ignore disconnect errors
+      }
+    }
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  return NextResponse.json({ 
+    message: 'Session reset not available in serverless environment. Please regenerate your session string using the authentication script and update your TELEGRAM_SESSION environment variable.' 
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -173,7 +120,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, channelUsername = 'mlmonchain', message } = body;
     
-    const telegramClient = await initTelegramClient();
+    const telegramClient = await createTelegramClient();
     
     switch (action) {
       case 'send_message':
