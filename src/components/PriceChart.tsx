@@ -119,45 +119,21 @@ export default function PriceChart({ symbol }: PriceChartProps) {
 
     // WebSocket connection for real-time data
     let ws: WebSocket | null = null;
-    if (symbol.toUpperCase() === 'BTC') {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws');
-    ws.onopen = () => {
-        ws!.send(JSON.stringify({
-        method: 'SUBSCRIBE',
-          params: [`btcusdt@kline_1h`],
-        id: 1
-      }));
-    };
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.k) {
-          const candle: CandlestickData = {
-            time: data.k.t / 1000 as Time,
-          open: parseFloat(data.k.o),
-          high: parseFloat(data.k.h),
-          low: parseFloat(data.k.l),
-          close: parseFloat(data.k.c)
-        };
-          candlestickSeries.update(candle);
-          setPrice(candle.close);
-          setPriceChange(((candle.close - candle.open) / candle.open) * 100);
-        }
-      };
-    } else if (symbol.toUpperCase() === 'HYPE') {
+    if (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'HYPE') {
       ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
       ws.onopen = () => {
         ws!.send(JSON.stringify({
           method: 'subscribe',
           subscription: {
             type: 'candle',
-            coin: 'HYPE',
+            coin: symbol.toUpperCase(),
             interval: '1h'
           }
         }));
       };
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        if (data.data && data.data.s === 'HYPE') {
+        if (data.data && data.data.s === symbol.toUpperCase()) {
           const candle: CandlestickData = {
             time: data.data.t / 1000 as Time,
             open: parseFloat(data.data.o),
@@ -165,11 +141,11 @@ export default function PriceChart({ symbol }: PriceChartProps) {
             low: parseFloat(data.data.l),
             close: parseFloat(data.data.c)
           };
-        candlestickSeries.update(candle);
-        setPrice(candle.close);
-        setPriceChange(((candle.close - candle.open) / candle.open) * 100);
-      }
-    };
+          candlestickSeries.update(candle);
+          setPrice(candle.close);
+          setPriceChange(((candle.close - candle.open) / candle.open) * 100);
+        }
+      };
     }
 
     const handleResize = () => {
