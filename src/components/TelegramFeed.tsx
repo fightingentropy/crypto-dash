@@ -18,58 +18,125 @@ interface ChannelInfo {
   about?: string;
 }
 
-export default function TelegramFeed() {
-  const [messages, setMessages] = useState<TelegramMessage[]>([]);
-  const [channelInfo, setChannelInfo] = useState<ChannelInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [limit, setLimit] = useState(10);
+interface ChannelData {
+  messages: TelegramMessage[];
+  channelInfo: ChannelInfo | null;
+  loading: boolean;
+  error: string | null;
+}
 
-  const fetchChannelInfo = async () => {
+const CHANNELS = [
+  { id: 'mlmonchain', name: '@mlmonchain', displayName: 'ML MonChain' },
+  { id: 'infinityhedge', name: '@infinityhedge', displayName: 'Infinity Hedge' }
+];
+
+export default function TelegramFeed() {
+  const [activeChannel, setActiveChannel] = useState('mlmonchain');
+  const [limit, setLimit] = useState(10);
+  const [channelData, setChannelData] = useState<Record<string, ChannelData>>({
+    mlmonchain: { messages: [], channelInfo: null, loading: true, error: null },
+    infinityhedge: { messages: [], channelInfo: null, loading: true, error: null }
+  });
+
+  const fetchChannelInfo = async (channelId: string) => {
     try {
-      const response = await fetch('/api/telegram?action=channel_info&channel=mlmonchain');
+      const response = await fetch(`/api/telegram?action=channel_info&channel=${channelId}`);
       const data = await response.json();
       
       if (response.ok) {
-        setChannelInfo(data);
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            channelInfo: data,
+            error: null
+          }
+        }));
       } else {
-        setError(data.error || 'Failed to fetch channel info');
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            error: data.error || 'Failed to fetch channel info'
+          }
+        }));
       }
     } catch {
-      setError('Network error fetching channel info');
+      setChannelData(prev => ({
+        ...prev,
+        [channelId]: {
+          ...prev[channelId],
+          error: 'Network error fetching channel info'
+        }
+      }));
     }
   };
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (channelId: string) => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/telegram?action=messages&channel=mlmonchain&limit=${limit}`);
+      setChannelData(prev => ({
+        ...prev,
+        [channelId]: {
+          ...prev[channelId],
+          loading: true
+        }
+      }));
+
+      const response = await fetch(`/api/telegram?action=messages&channel=${channelId}&limit=${limit}`);
       const data = await response.json();
       
       if (response.ok) {
         // API returns an array directly, not { messages: [...] }
         const messagesArray = Array.isArray(data) ? data : data.messages || [];
-        setMessages(messagesArray.map((msg: { id: number; message?: string; date: number; sender?: string; views?: number }) => ({
+        const formattedMessages = messagesArray.map((msg: { id: number; message?: string; date: number; sender?: string; views?: number }) => ({
           id: msg.id,
           text: msg.message || '',
           date: new Date(msg.date * 1000), // Convert Unix timestamp to Date
           sender: msg.sender || 'Channel',
           views: msg.views || 0
-        })));
-        setError(null);
+        }));
+
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            messages: formattedMessages,
+            error: null,
+            loading: false
+          }
+        }));
       } else {
-        setError(data.error || 'Failed to fetch messages');
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            error: data.error || 'Failed to fetch messages',
+            loading: false
+          }
+        }));
       }
     } catch {
-      setError('Network error fetching messages');
-    } finally {
-      setLoading(false);
+      setChannelData(prev => ({
+        ...prev,
+        [channelId]: {
+          ...prev[channelId],
+          error: 'Network error fetching messages',
+          loading: false
+        }
+      }));
     }
   }, [limit]);
 
+  const refreshActiveChannel = () => {
+    fetchMessages(activeChannel);
+  };
+
   useEffect(() => {
-    fetchChannelInfo();
-    fetchMessages();
+    // Fetch info for all channels
+    CHANNELS.forEach(channel => {
+      fetchChannelInfo(channel.id);
+      fetchMessages(channel.id);
+    });
   }, [fetchMessages]);
 
   const formatDate = (date: Date) => {
@@ -82,16 +149,33 @@ export default function TelegramFeed() {
     });
   };
 
-  if (error) {
+  const currentChannelData = channelData[activeChannel];
+
+  // If there's an error with the current channel, don't show anything
+  if (currentChannelData.error) {
     return null;
   }
 
   return (
     <div className="bg-[#181A20] border border-gray-700 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-[#F0F3FA]">
-            {channelInfo ? `@${channelInfo.username}` : '@mlmonchain'}
-          </h2>
+      {/* Channel Tabs */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex bg-gray-800 rounded-lg p-1">
+          {CHANNELS.map((channel) => (
+            <button
+              key={channel.id}
+              onClick={() => setActiveChannel(channel.id)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                activeChannel === channel.id
+                  ? 'bg-[#F0F3FA] text-gray-900'
+                  : 'text-gray-400 hover:text-[#F0F3FA]'
+              }`}
+            >
+              {channel.displayName}
+            </button>
+          ))}
+        </div>
+        
         <div className="flex items-center gap-2">
           <select
             value={limit}
@@ -104,13 +188,13 @@ export default function TelegramFeed() {
             <option value={50}>50</option>
           </select>
           <button
-            onClick={fetchMessages}
-            disabled={loading}
+            onClick={refreshActiveChannel}
+            disabled={currentChannelData.loading}
             className="text-gray-400 hover:text-[#F0F3FA] disabled:text-gray-600 transition-colors"
             title="Refresh messages"
           >
             <svg
-              className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 ${currentChannelData.loading ? 'animate-spin' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -126,17 +210,33 @@ export default function TelegramFeed() {
         </div>
       </div>
 
-      {loading ? (
+      {/* Channel Header */}
+      <div className="mb-3">
+        <h2 className="text-lg font-bold text-[#F0F3FA]">
+          {currentChannelData.channelInfo 
+            ? `@${currentChannelData.channelInfo.username}` 
+            : CHANNELS.find(c => c.id === activeChannel)?.name || ''}
+        </h2>
+        {currentChannelData.channelInfo && (
+          <p className="text-xs text-gray-400">
+            {currentChannelData.channelInfo.participantsCount.toLocaleString()} subscribers
+            {currentChannelData.channelInfo.about && ` • ${currentChannelData.channelInfo.about}`}
+          </p>
+        )}
+      </div>
+
+      {/* Messages */}
+      {currentChannelData.loading ? (
         <div className="flex items-center justify-center py-4">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#F0F3FA]"></div>
           <span className="ml-2 text-gray-400 text-sm">Loading...</span>
         </div>
       ) : (
         <div className="space-y-3 max-h-80 overflow-y-auto">
-          {messages.length === 0 ? (
+          {currentChannelData.messages.length === 0 ? (
             <p className="text-gray-400 text-center py-3 text-sm">No messages found</p>
           ) : (
-            messages.map((message) => (
+            currentChannelData.messages.map((message) => (
               <div
                 key={message.id}
                 className="bg-gray-800/50 border border-gray-700 rounded p-3 hover:bg-gray-800/70 transition-colors"
@@ -159,8 +259,6 @@ export default function TelegramFeed() {
           )}
         </div>
       )}
-
-
     </div>
   );
 } 
