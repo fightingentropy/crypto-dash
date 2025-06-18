@@ -1,7 +1,46 @@
-import { getEconomicIndicators } from '@/lib/economicIndicators';
+'use client';
 
-export default async function EconomicIndicators() {
-  const indicators = await getEconomicIndicators();
+import { useState, useEffect } from 'react';
+
+interface Indicator {
+  name: string;
+  value: string;
+  date: string;
+}
+
+export default function EconomicIndicators() {
+  const [indicators, setIndicators] = useState<Indicator[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchIndicators = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/economic-indicators');
+        if (response.ok) {
+          const data = await response.json();
+          setIndicators(data);
+        }
+      } catch {
+        // Silently handle errors to keep console clean
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchIndicators();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
+        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Economic Indicators</h2>
+        <div className="space-y-4">
+          <p className="text-gray-500 dark:text-gray-400">Loading economic indicators...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
