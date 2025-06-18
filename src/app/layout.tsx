@@ -6,14 +6,14 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Crypto Dashboard",
-  description: "Real-time cryptocurrency price charts for BTC, ETH, and Hyperliquid",
+  description: "A real-time cryptocurrency dashboard.",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
       <body className={inter.className}>{children}</body>

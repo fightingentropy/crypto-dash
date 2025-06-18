@@ -128,16 +128,21 @@ export default function TelegramFeed() {
   }, [limit]);
 
   const refreshActiveChannel = () => {
-    fetchMessages(activeChannel);
+    // Only fetch if not currently loading
+    if (!channelData[activeChannel].loading) {
+      fetchMessages(activeChannel);
+    }
   };
 
+  // Fetch data for the active channel, or when the active channel changes
   useEffect(() => {
-    // Fetch info for all channels
-    CHANNELS.forEach(channel => {
-      fetchChannelInfo(channel.id);
-      fetchMessages(channel.id);
-    });
-  }, [fetchMessages]);
+    const current = channelData[activeChannel];
+    // Fetch only if it has not been fetched before (i.e., no messages and no error)
+    if (current.messages.length === 0 && !current.error) {
+      fetchChannelInfo(activeChannel);
+      fetchMessages(activeChannel);
+    }
+  }, [activeChannel, fetchMessages]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
@@ -157,7 +162,7 @@ export default function TelegramFeed() {
   }
 
   return (
-    <div className="bg-[#181A20] border border-gray-700 rounded-lg p-4">
+    <div className="bg-white rounded-lg shadow-sm p-6">
       {/* Channel Tabs */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex bg-gray-800 rounded-lg p-1">
@@ -228,18 +233,18 @@ export default function TelegramFeed() {
       {/* Messages */}
       {currentChannelData.loading ? (
         <div className="flex items-center justify-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#F0F3FA]"></div>
-          <span className="ml-2 text-gray-400 text-sm">Loading...</span>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+          <span className="ml-2 text-gray-500 text-sm">Loading...</span>
         </div>
       ) : (
         <div className="space-y-3 max-h-80 overflow-y-auto">
           {currentChannelData.messages.length === 0 ? (
-            <p className="text-gray-400 text-center py-3 text-sm">No messages found</p>
+            <p className="text-gray-500 text-center py-3 text-sm">No messages found</p>
           ) : (
             currentChannelData.messages.map((message) => (
               <div
                 key={message.id}
-                className="bg-gray-800/50 border border-gray-700 rounded p-3 hover:bg-gray-800/70 transition-colors"
+                className="bg-gray-50 border border-gray-200 rounded p-3 hover:bg-gray-100 transition-colors"
               >
                 <div className="flex justify-between items-start mb-1">
                   <div className="text-xs text-gray-500">
@@ -251,7 +256,7 @@ export default function TelegramFeed() {
                     </div>
                   )}
                 </div>
-                <div className="text-[#F0F3FA] text-sm leading-relaxed">
+                <div className="text-gray-800 text-sm leading-relaxed">
                   {message.text || <em className="text-gray-500">Media message</em>}
                 </div>
               </div>

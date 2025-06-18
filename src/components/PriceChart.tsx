@@ -1,221 +1,47 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, CandlestickData, Time } from 'lightweight-charts';
+import { useState } from 'react';
+import { usePriceChart } from '@/hooks/usePriceChart';
+import ChartHeader from './ChartHeader';
 
-interface PriceChartProps {
-  symbol: string;
+// Define valid time range type
+type Range = '1D' | '7D' | '1M' | '3M' | '1Y';
+type Theme = 'light' | 'dark';
+
+const SunIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+);
+
+const MoonIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+);
+
+function PriceChart({ symbol }: { symbol: string }) {
+    const [theme, setTheme] = useState<Theme>('light');
+    const [range, setRange] = useState<Range>('1D');
+    
+    const chartContainerRef = usePriceChart(symbol, range, theme);
+
+    const toggleTheme = () => {
+        setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+    };
+
+    return (
+        <div className={`rounded-lg shadow-sm p-6 flex flex-col ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C22]'}`}>
+            <ChartHeader 
+                symbol={symbol}
+                range={range}
+                setRange={setRange}
+                theme={theme}
+                toggleTheme={toggleTheme}
+            />
+            <div ref={chartContainerRef} className="w-full h-96" />
+        </div>
+    );
 }
 
-export default function PriceChart({ symbol }: PriceChartProps) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [price, setPrice] = useState<number | null>(null);
-  const [priceChange, setPriceChange] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!chartContainerRef.current) return;
-
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#181A20' },
-        textColor: '#F0F3FA',
-      },
-      grid: {
-        vertLines: { color: '#22252B' },
-        horzLines: { color: '#22252B' },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 300,
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-        tickMarkFormatter: (time: Time) => {
-          // Handle both timestamp formats properly
-          const timestamp = typeof time === 'number' ? time : Number(time);
-          // If timestamp is in seconds, convert to milliseconds
-          const timeInMs = timestamp > 1e10 ? timestamp : timestamp * 1000;
-          const date = new Date(timeInMs);
-          
-          // Check if date is valid
-          if (isNaN(date.getTime())) {
-            return '00:00';
-          }
-          
-          const hours = date.getHours().toString().padStart(2, '0');
-          const minutes = date.getMinutes().toString().padStart(2, '0');
-          return `${hours}:${minutes}`;
-        },
-        fixLeftEdge: true,
-        fixRightEdge: true,
-        borderVisible: false,
-        minimumHeight: 40,
-        ticksVisible: true,
-      },
-    });
-
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-      priceLineVisible: true,
-    });
-
-    // Fetch historical data from local API route
-    fetch(`/api/binance?symbol=${symbol}`)
-      .then(res => res.json())
-      .then((data) => {
-        if (!Array.isArray(data)) {
-          setError(data?.error || 'No data found for this symbol.');
-          return;
-        }
-        
-        if (data.length === 0) {
-          setError('No historical data available.');
-          return;
-        }
-        
-        let formatted: CandlestickData[] = [];
-        // All symbols now use Hyperliquid format: [{ T, c, h, l, o, t, ... }]
-        formatted = data.map((d: { t: number; o: string; h: string; l: string; c: string }) => {
-          const time = d.t / 1000; // Convert milliseconds to seconds
-          const open = parseFloat(d.o);
-          const high = parseFloat(d.h);
-          const low = parseFloat(d.l);
-          const close = parseFloat(d.c);
-          
-          // Validate the data
-          if (isNaN(time) || isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) {
-            return null;
-          }
-          
-          return {
-            time: time as Time,
-            open,
-            high,
-            low,
-            close,
-          };
-        }).filter(Boolean) as CandlestickData[]; // Remove null values
-        
-        // Validate we have valid formatted data
-        if (formatted.length === 0) {
-          setError('No valid candle data available.');
-          return;
-        }
-
-        candlestickSeries.setData(formatted);
-        if (formatted.length > 0) {
-          setPrice(formatted[formatted.length - 1].close);
-          setPriceChange(((formatted[formatted.length - 1].close - formatted[0].open) / formatted[0].open) * 100);
-        }
-        
-        // Show only the last 7 days (168 hours) for better time scale readability
-        if (formatted.length > 168) {
-          const recentData = formatted.slice(-168);
-          candlestickSeries.setData(recentData);
-          
-          // Set visible range to show last 24 hours for better time label distribution
-          const lastTime = recentData[recentData.length - 1].time;
-          const firstVisibleTime = Number(lastTime) - (24 * 60 * 60); // 24 hours ago
-          chart.timeScale().setVisibleRange({
-            from: firstVisibleTime as Time,
-            to: lastTime
-          });
-          
-          // Also set logical range to ensure the last 24 bars are visible
-          chart.timeScale().setVisibleLogicalRange({
-            from: Math.max(recentData.length - 24, 0),
-            to: recentData.length
-          });
-        } else {
-          // Fit the chart to show the latest data
-          chart.timeScale().fitContent();
-        }
-        
-        // Fit the chart to show the latest data
-        chart.timeScale().scrollToRealTime();
-      })
-      .catch(() => {
-        setError('Failed to fetch historical data.');
-      });
-
-    // WebSocket connection for real-time data - using Hyperliquid for all symbols
-    let ws: WebSocket | null = null;
-    if (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'HYPE') {
-      ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
-      ws.onopen = () => {
-        ws!.send(JSON.stringify({
-          method: 'subscribe',
-          subscription: {
-            type: 'candle',
-            coin: symbol.toUpperCase(),
-            interval: '1h'
-          }
-        }));
-      };
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.data && data.data.s === symbol.toUpperCase()) {
-          const time = data.data.t / 1000; // Convert milliseconds to seconds
-          const open = parseFloat(data.data.o);
-          const high = parseFloat(data.data.h);
-          const low = parseFloat(data.data.l);
-          const close = parseFloat(data.data.c);
-          
-          // Validate the real-time data
-          if (!isNaN(time) && !isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
-            const candle: CandlestickData = {
-              time: time as Time,
-              open,
-              high,
-              low,
-              close
-            };
-            candlestickSeries.update(candle);
-            setPrice(candle.close);
-            setPriceChange(((candle.close - candle.open) / candle.open) * 100);
-          }
-        }
-      };
-    }
-
-    const handleResize = () => {
-      if (chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
-      }
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (ws) ws.close();
-      chart.remove();
-    };
-  }, [symbol]);
-
-  return (
-    <div className="bg-[#181A20] rounded-lg shadow p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-[#F0F3FA]">
-          {symbol === 'BTC' ? 'BTC-PERP' : symbol === 'HYPE' ? 'HYPE-PERP' : `${symbol}/USDT`}
-        </h2>
-        <div className="text-right">
-          <div className="text-lg font-medium text-[#F0F3FA]">
-            {price ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Loading...'}
-          </div>
-          <div className={`text-sm ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-          </div>
-        </div>
-      </div>
-      {error ? (
-        <div className="text-red-400 text-center py-8">{error}</div>
-      ) : (
-      <div ref={chartContainerRef} className="w-full" />
-      )}
-    </div>
-  );
-} 
+export default PriceChart; 
