@@ -118,7 +118,7 @@ export function usePriceChart(symbol: string, range: Range) {
                     // Cache the data with current timestamp
                     dataCache.set(cacheKey, { data: candles, timestamp: now });
                 }
-            } catch (error) {
+            } catch {
                 // Silently handle fetch errors
             }
         };

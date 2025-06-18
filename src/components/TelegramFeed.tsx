@@ -31,7 +31,8 @@ const CHANNELS = [
 ];
 
 // Cache for Telegram data with 5-minute expiry
-const telegramCache = new Map<string, { data: any, timestamp: number }>();
+const channelInfoCache = new Map<string, { data: ChannelInfo, timestamp: number }>();
+const messagesCache = new Map<string, { data: TelegramMessage[], timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export default function TelegramFeed() {
@@ -44,7 +45,7 @@ export default function TelegramFeed() {
 
   const fetchChannelInfo = useCallback(async (channelId: string) => {
     const cacheKey = `channelInfo-${channelId}`;
-    const cached = telegramCache.get(cacheKey);
+    const cached = channelInfoCache.get(cacheKey);
     const now = Date.now();
 
     // Use cached data if it's less than 5 minutes old
@@ -73,7 +74,7 @@ export default function TelegramFeed() {
       
       if (response.ok) {
         // Cache the successful response
-        telegramCache.set(cacheKey, { data, timestamp: now });
+        channelInfoCache.set(cacheKey, { data, timestamp: now });
         
         setChannelData(prev => ({
           ...prev,
@@ -92,8 +93,8 @@ export default function TelegramFeed() {
           }
         }));
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         // Request was aborted due to timeout - hide component
         setChannelData(prev => ({
           ...prev,
@@ -108,7 +109,7 @@ export default function TelegramFeed() {
 
   const fetchMessages = useCallback(async (channelId: string) => {
     const cacheKey = `messages-${channelId}-${limit}`;
-    const cached = telegramCache.get(cacheKey);
+    const cached = messagesCache.get(cacheKey);
     const now = Date.now();
 
     // Use cached data if it's less than 5 minutes old
@@ -155,7 +156,7 @@ export default function TelegramFeed() {
         }));
 
         // Cache the successful response
-        telegramCache.set(cacheKey, { data: formattedMessages, timestamp: now });
+        messagesCache.set(cacheKey, { data: formattedMessages, timestamp: now });
 
         setChannelData(prev => ({
           ...prev,
@@ -176,8 +177,8 @@ export default function TelegramFeed() {
           }
         }));
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         // Request was aborted due to timeout - hide component
         setChannelData(prev => ({
           ...prev,
@@ -195,8 +196,8 @@ export default function TelegramFeed() {
     // Clear cache for this channel and refetch
     const cacheKeyInfo = `channelInfo-${activeChannel}`;
     const cacheKeyMessages = `messages-${activeChannel}-${limit}`;
-    telegramCache.delete(cacheKeyInfo);
-    telegramCache.delete(cacheKeyMessages);
+    channelInfoCache.delete(cacheKeyInfo);
+    messagesCache.delete(cacheKeyMessages);
     
     if (!channelData[activeChannel].loading) {
       fetchChannelInfo(activeChannel);
@@ -211,7 +212,7 @@ export default function TelegramFeed() {
       fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
-  }, [activeChannel, fetchChannelInfo, fetchMessages]);
+  }, [activeChannel, fetchChannelInfo, fetchMessages, channelData]);
 
   // Refetch messages only when the limit changes, skipping the initial render
   const isInitialMount = useRef(true);
@@ -223,12 +224,12 @@ export default function TelegramFeed() {
 
     // Clear cache and refetch with new limit
     const cacheKey = `messages-${activeChannel}-${limit}`;
-    telegramCache.delete(cacheKey);
+    messagesCache.delete(cacheKey);
     
     if (!channelData[activeChannel].loading) {
       fetchMessages(activeChannel);
     }
-  }, [limit, fetchMessages, activeChannel]);
+  }, [limit, fetchMessages, activeChannel, channelData]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
