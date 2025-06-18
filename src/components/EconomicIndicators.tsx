@@ -1,52 +1,13 @@
-'use client';
+import { getEconomicIndicators } from '@/lib/economicIndicators';
 
-import { useState, useEffect } from 'react';
-
-interface Indicator {
-  name: string;
-  value: string;
-  date: string;
-}
-
-export default function EconomicIndicators() {
-  const [indicators, setIndicators] = useState<Indicator[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchIndicators = async () => {
-      try {
-        setLoading(true);
-        
-        // Add timeout to prevent hanging requests
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch('/api/economic-indicators', {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        if (response.ok) {
-          setIndicators(data);
-        }
-      } catch {
-        // Silently handle errors - keep console clean
-        // Keep existing data if fetch fails
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchIndicators();
-  }, []);
+export default async function EconomicIndicators() {
+  const indicators = await getEconomicIndicators();
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
       <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Economic Indicators</h2>
       <div className="space-y-4">
-        {loading && !indicators.length ? (
-          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-        ) : (
+        {indicators.length ? (
           indicators.map(indicator => (
             <div key={indicator.name} className="flex justify-between items-baseline">
               <span className="text-gray-700 dark:text-gray-300">{indicator.name}</span>
@@ -56,11 +17,10 @@ export default function EconomicIndicators() {
               </span>
             </div>
           ))
-        )}
-        {!loading && !indicators.length && (
-            <p className="text-gray-500 dark:text-gray-400">No valid upcoming economic events found.</p>
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400">No valid upcoming economic events found.</p>
         )}
       </div>
     </div>
   );
-} 
+}
