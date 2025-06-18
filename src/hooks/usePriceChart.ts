@@ -16,24 +16,48 @@ export function usePriceChart(symbol: string, range: Range, setIsLoading?: (load
     const chart = useRef<IChartApi | null>(null);
     const candlestickSeries = useRef<ISeriesApi<'Candlestick'> | null>(null);
 
+    // Function to get theme colors
+    const getThemeColors = () => {
+        const isDark = document.documentElement.classList.contains('dark');
+        return {
+            background: isDark ? '#1f2937' : '#FFFFFF', // gray-800 : white
+            textColor: isDark ? '#f9fafb' : '#1C1C22',  // gray-50 : dark
+            gridColor: isDark ? '#374151' : '#f3f4f6',   // gray-700 : gray-100
+            crosshairColor: isDark ? '#6b7280' : '#9B9B9B', // gray-500 : gray-400
+        };
+    };
+
     // Chart Initialization & Theme
     useEffect(() => {
         if (!chartContainerRef.current) return;
+
+        const colors = getThemeColors();
 
         const chartInstance = createChart(chartContainerRef.current, {
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
             layout: {
-                background: { color: '#FFFFFF' },
-                textColor: '#1C1C22',
+                background: { color: colors.background },
+                textColor: colors.textColor,
             },
-            timeScale: { timeVisible: true, secondsVisible: false, borderVisible: false },
-            rightPriceScale: { borderVisible: false },
+            timeScale: { 
+                timeVisible: true, 
+                secondsVisible: false, 
+                borderVisible: false,
+                borderColor: colors.gridColor,
+            },
+            rightPriceScale: { 
+                borderVisible: false,
+                borderColor: colors.gridColor,
+            },
             crosshair: { 
                 horzLine: { visible: false, labelVisible: false }, 
-                vertLine: { style: LineStyle.Dashed, color: '#9B9B9B' } 
+                vertLine: { style: LineStyle.Dashed, color: colors.crosshairColor } 
             },
-            grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+            grid: { 
+                vertLines: { color: colors.gridColor, visible: true }, 
+                horzLines: { color: colors.gridColor, visible: true } 
+            },
             handleScroll: true,
             handleScale: true,
             watermark: { visible: false },
@@ -48,6 +72,42 @@ export function usePriceChart(symbol: string, range: Range, setIsLoading?: (load
             wickDownColor: '#ef5350',
         });
 
+        // Listen for theme changes
+        const updateChartTheme = () => {
+            if (chart.current) {
+                const newColors = getThemeColors();
+                chart.current.applyOptions({
+                    layout: {
+                        background: { color: newColors.background },
+                        textColor: newColors.textColor,
+                    },
+                    timeScale: {
+                        borderColor: newColors.gridColor,
+                    },
+                    rightPriceScale: {
+                        borderColor: newColors.gridColor,
+                    },
+                    crosshair: {
+                        vertLine: { color: newColors.crosshairColor }
+                    },
+                    grid: {
+                        vertLines: { color: newColors.gridColor },
+                        horzLines: { color: newColors.gridColor }
+                    },
+                });
+            }
+        };
+
+        // Watch for theme changes
+        const observer = new MutationObserver(() => {
+            updateChartTheme();
+        });
+        
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+
         const handleResize = () => {
             if (chart.current && chartContainerRef.current) {
                 chart.current.resize(chartContainerRef.current.clientWidth, chartContainerRef.current.clientHeight);
@@ -56,6 +116,7 @@ export function usePriceChart(symbol: string, range: Range, setIsLoading?: (load
         window.addEventListener('resize', handleResize);
 
         return () => {
+            observer.disconnect();
             window.removeEventListener('resize', handleResize);
             chart.current?.remove();
         };
@@ -103,11 +164,18 @@ export function usePriceChart(symbol: string, range: Range, setIsLoading?: (load
             };
 
             try {
+                // Add timeout to prevent hanging requests
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+                
                 const response = await fetch('https://api.hyperliquid.xyz/info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
+                    signal: controller.signal,
                 });
+                clearTimeout(timeoutId);
+                
                 if (!response.ok) {
                     throw new Error(`API Error: ${response.status}`);
                 }
@@ -121,7 +189,7 @@ export function usePriceChart(symbol: string, range: Range, setIsLoading?: (load
                     dataCache.set(cacheKey, { data: candles, timestamp: now });
                 }
             } catch {
-                // Silently handle fetch errors
+                // Silently handle fetch errors to keep console clean
             } finally {
                 setIsLoading?.(false);
             }

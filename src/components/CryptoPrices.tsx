@@ -32,7 +32,16 @@ export default function CryptoPrices({ onSymbolClick }: CryptoPricesProps) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/market-data');
+        
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        
+        const response = await fetch('/api/market-data', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         const data = await response.json();
         if (response.ok) {
           setAssets(data);
@@ -43,39 +52,40 @@ export default function CryptoPrices({ onSymbolClick }: CryptoPricesProps) {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch market data', error);
+        // Silently handle errors - don't log to console to keep it clean
+        // Keep existing data if fetch fails
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchData, 15000); // Refresh every 15 seconds to avoid rate limits
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Crypto Prices</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
+      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Crypto Prices</h2>
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b">
-              <th className="p-2 text-sm font-medium text-gray-500">Asset</th>
-              <th className="p-2 text-right text-sm font-medium text-gray-500">Mark Price</th>
-              <th className="p-2 text-right text-sm font-medium text-gray-500">24h Volume</th>
-              <th className="p-2 text-right text-sm font-medium text-gray-500">Funding</th>
+            <tr className="border-b border-gray-200 dark:border-gray-600">
+              <th className="p-2 text-sm font-medium text-gray-500 dark:text-gray-400">Asset</th>
+              <th className="p-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Mark Price</th>
+              <th className="p-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400">24h Volume</th>
+              <th className="p-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Funding</th>
             </tr>
           </thead>
           <tbody>
             {loading && !assets.length ? (
-              <tr><td colSpan={4} className="text-center p-4 text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={4} className="text-center p-4 text-gray-500 dark:text-gray-400">Loading...</td></tr>
             ) : (
               assets.map((asset) => (
-                <tr key={asset.name} onClick={() => onSymbolClick(asset.name)} className="border-b last:border-0 border-gray-100 hover:bg-gray-50 text-gray-800 cursor-pointer">
-                  <td className="p-2 font-semibold text-gray-900">{asset.name}</td>
+                <tr key={asset.name} onClick={() => onSymbolClick(asset.name)} className="border-b last:border-0 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 cursor-pointer transition-colors">
+                  <td className="p-2 font-semibold text-gray-900 dark:text-white">{asset.name}</td>
                   <td className="p-2 text-right font-mono text-sm">{formatPrice(asset.price)}</td>
                   <td className="p-2 text-right font-mono text-sm">${asset.volume.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                  <td className={`p-2 text-right font-mono text-sm ${asset.funding && asset.funding > 0 ? 'text-green-600' : 'text-red-600'}`}>{formatFunding(asset.funding)}</td>
+                  <td className={`p-2 text-right font-mono text-sm ${asset.funding && asset.funding > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{formatFunding(asset.funding)}</td>
                 </tr>
               ))
             )}

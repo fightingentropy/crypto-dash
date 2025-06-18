@@ -357,18 +357,18 @@ export default function TelegramFeed() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
       {/* Channel Tabs */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex bg-gray-800 rounded-lg p-1">
+        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
           {CHANNELS.map((channel) => (
             <button
               key={channel.id}
               onClick={() => setActiveChannel(channel.id)}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 activeChannel === channel.id
-                  ? 'bg-[#F0F3FA] text-gray-900'
-                  : 'text-gray-400 hover:text-[#F0F3FA]'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
               {channel.displayName}
@@ -380,7 +380,7 @@ export default function TelegramFeed() {
           <select
             value={limit}
             onChange={(e) => setLimit(parseInt(e.target.value))}
-            className="bg-gray-800 border border-gray-600 text-[#F0F3FA] text-xs rounded px-2 py-1"
+            className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value={5}>5</option>
             <option value={10}>10</option>
@@ -390,7 +390,7 @@ export default function TelegramFeed() {
           <button
             onClick={refreshActiveChannel}
             disabled={currentChannelData.loading}
-            className="text-gray-400 hover:text-[#F0F3FA] disabled:text-gray-600 transition-colors"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:text-gray-400 dark:disabled:text-gray-600 transition-colors"
             title="Refresh messages"
           >
             <svg
@@ -413,31 +413,31 @@ export default function TelegramFeed() {
       {/* Messages */}
       {currentChannelData.loading ? (
         <div className="flex items-center justify-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-          <span className="ml-2 text-gray-500 text-sm">Loading...</span>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-white"></div>
+          <span className="ml-2 text-gray-500 dark:text-gray-400 text-sm">Loading...</span>
         </div>
       ) : (
         <div className="space-y-3 max-h-80 overflow-y-auto">
           {currentChannelData.messages.length === 0 ? (
-            <p className="text-gray-500 text-center py-3 text-sm">No messages found</p>
+            <p className="text-gray-500 dark:text-gray-400 text-center py-3 text-sm">No messages found</p>
           ) : (
             currentChannelData.messages.map((message) => (
               <div
                 key={message.id}
-                className="bg-gray-50 border border-gray-200 rounded p-3 hover:bg-gray-100 transition-colors"
+                className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded p-3 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <div className="flex justify-between items-start mb-1">
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     #{message.id} • {formatDate(message.date)}
                   </div>
                   {message.views && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       {message.views.toLocaleString()} views
                     </div>
                   )}
                 </div>
-                <div className="text-gray-800 text-sm leading-relaxed">
-                  {message.text || <em className="text-gray-500">Media message</em>}
+                <div className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+                  {message.text || <em className="text-gray-500 dark:text-gray-400">Media message</em>}
                 </div>
               </div>
             ))

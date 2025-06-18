@@ -16,13 +16,23 @@ export default function EconomicIndicators() {
     const fetchIndicators = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/economic-indicators');
+        
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch('/api/economic-indicators', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         const data = await response.json();
         if (response.ok) {
           setIndicators(data);
         }
       } catch (error) {
-        console.error('Failed to fetch economic indicators', error);
+        // Silently handle errors - keep console clean
+        // Keep existing data if fetch fails
       } finally {
         setLoading(false);
       }
@@ -31,24 +41,24 @@ export default function EconomicIndicators() {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-2xl font-bold mb-4" style={{color: '#111827'}}>Economic Indicators</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
+      <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Economic Indicators</h2>
       <div className="space-y-4">
         {loading && !indicators.length ? (
-          <p style={{color: '#6B7280'}}>Loading...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
         ) : (
           indicators.map(indicator => (
             <div key={indicator.name} className="flex justify-between items-baseline">
-              <span style={{color: '#374151'}}>{indicator.name}</span>
-              <span className="font-mono text-lg font-semibold" style={{color: '#111827'}}>
+              <span className="text-gray-700 dark:text-gray-300">{indicator.name}</span>
+              <span className="font-mono text-lg font-semibold text-gray-900 dark:text-white">
                 {indicator.value}
-                <span className="text-sm font-normal ml-2" style={{color: '#4B5563'}}>({indicator.date})</span>
+                <span className="text-sm font-normal ml-2 text-gray-600 dark:text-gray-400">({indicator.date})</span>
               </span>
             </div>
           ))
         )}
         {!loading && !indicators.length && (
-            <p style={{color: '#6B7280'}}>No valid upcoming economic events found.</p>
+            <p className="text-gray-500 dark:text-gray-400">No valid upcoming economic events found.</p>
         )}
       </div>
     </div>
