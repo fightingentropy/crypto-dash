@@ -1,24 +1,30 @@
 import { useEffect, useRef } from 'react';
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, LineStyle, CandlestickData } from 'lightweight-charts';
 
-type Theme = 'light' | 'dark';
 type Range = '1D' | '7D' | '1M' | '3M' | '1Y';
 
-export function usePriceChart(symbol: string, range: Range, theme: Theme) {
+export function usePriceChart(symbol: string, range: Range) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chart = useRef<IChartApi | null>(null);
     const candlestickSeries = useRef<ISeriesApi<'Candlestick'> | null>(null);
 
-    // Chart Initialization
+    // Chart Initialization & Theme
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
         const chartInstance = createChart(chartContainerRef.current, {
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
+            layout: {
+                background: { color: '#FFFFFF' },
+                textColor: '#1C1C22',
+            },
             timeScale: { timeVisible: true, secondsVisible: false, borderVisible: false },
             rightPriceScale: { borderVisible: false },
-            crosshair: { horzLine: { visible: false, labelVisible: false }, vertLine: { style: LineStyle.Dashed } },
+            crosshair: { 
+                horzLine: { visible: false, labelVisible: false }, 
+                vertLine: { style: LineStyle.Dashed, color: '#9B9B9B' } 
+            },
             grid: { vertLines: { visible: false }, horzLines: { visible: false } },
             handleScroll: true,
             handleScale: true,
@@ -46,20 +52,6 @@ export function usePriceChart(symbol: string, range: Range, theme: Theme) {
             chart.current?.remove();
         };
     }, []);
-
-    // Theme Updates
-    useEffect(() => {
-        if (!chart.current) return;
-        chart.current.applyOptions({
-            layout: {
-                background: { color: theme === 'light' ? '#FFFFFF' : '#1C1C22' },
-                textColor: theme === 'light' ? '#1C1C22' : '#FFFFFF',
-            },
-            crosshair: {
-                vertLine: { color: theme === 'light' ? '#9B9B9B' : '#555' },
-            },
-        });
-    }, [theme]);
 
     // Data Fetching and Live Feed
     useEffect(() => {
