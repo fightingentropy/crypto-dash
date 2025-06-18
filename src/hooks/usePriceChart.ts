@@ -59,7 +59,7 @@ export function usePriceChart(symbol: string, range: Range) {
 
         const series = candlestickSeries.current;
 
-        const getCandle = (i: any): CandlestickData => ({
+        const getCandle = (i: { t: number; o: string; h: string; l: string; c: string; }): CandlestickData => ({
             time: Math.floor(i.t / 1000) as UTCTimestamp,
             open: parseFloat(i.o),
             high: parseFloat(i.h),

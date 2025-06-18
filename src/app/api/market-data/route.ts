@@ -7,6 +7,13 @@ interface Asset {
   funding: number | null;
 }
 
+interface AssetContext {
+    name: string;
+    dayNtlVlm: string;
+    markPx: string;
+    funding: string;
+}
+
 const SYMBOLS = ['BTC', 'ETH', 'HYPE', 'SOL', 'FARTCOIN', 'XRP', 'SUI', 'kPEPE', 'SPX', 'AAVE'];
 
 export async function GET() {
@@ -23,23 +30,23 @@ export async function GET() {
     }
 
     const data = await response.json();
-    const [meta, assetCtxs] = data;
+    const [meta, assetCtxs]: [any, AssetContext[]] = data;
     
     const assets: Asset[] = [];
 
     if (meta.universe && assetCtxs) {
-        // The universe array and assetCtxs array correspond by index.
-        meta.universe.forEach((assetInfo: any, index: number) => {
-            if (SYMBOLS.includes(assetInfo.name)) {
-                const assetCtx = assetCtxs[index];
-                assets.push({
-                    name: assetInfo.name,
-                    price: assetCtx.markPx ? parseFloat(assetCtx.markPx) : 0,
-                    volume: assetCtx.dayNtlVlm ? parseFloat(assetCtx.dayNtlVlm) : 0,
-                    funding: assetCtx.funding ? parseFloat(assetCtx.funding) : null,
-                });
-            }
-        });
+        const universe = meta.universe;
+        const assetCtxMap = new Map(universe.map((u: {name: string}, i: number) => [u.name, assetCtxs[i]]));
+        
+        for (const symbol of SYMBOLS) {
+            const assetData: Partial<AssetContext> = assetCtxMap.get(symbol) || {};
+            assets.push({
+                name: symbol,
+                price: assetData.markPx ? parseFloat(assetData.markPx) : 0,
+                volume: assetData.dayNtlVlm ? parseFloat(assetData.dayNtlVlm) : 0,
+                funding: assetData.funding ? parseFloat(assetData.funding) : null,
+            });
+        }
     }
 
     // Ensure the order is the same as the SYMBOLS array for consistent display

@@ -142,7 +142,7 @@ export default function TelegramFeed() {
       fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
-  }, [activeChannel, fetchMessages]);
+  }, [activeChannel, fetchMessages, channelData]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
