@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface TelegramMessage {
   id: number;
@@ -30,20 +30,51 @@ const CHANNELS = [
   { id: 'infinityhedge', name: '@infinityhedge', displayName: 'Infinity Hedge' }
 ];
 
+// Cache for Telegram data with 5-minute expiry
+const telegramCache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export default function TelegramFeed() {
   const [activeChannel, setActiveChannel] = useState('mlmonchain');
   const [limit, setLimit] = useState(10);
   const [channelData, setChannelData] = useState<Record<string, ChannelData>>({
-    mlmonchain: { messages: [], channelInfo: null, loading: true, error: null },
-    infinityhedge: { messages: [], channelInfo: null, loading: true, error: null }
+    mlmonchain: { messages: [], channelInfo: null, loading: false, error: null },
+    infinityhedge: { messages: [], channelInfo: null, loading: false, error: null }
   });
 
   const fetchChannelInfo = useCallback(async (channelId: string) => {
+    const cacheKey = `channelInfo-${channelId}`;
+    const cached = telegramCache.get(cacheKey);
+    const now = Date.now();
+
+    // Use cached data if it's less than 5 minutes old
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      setChannelData(prev => ({
+        ...prev,
+        [channelId]: {
+          ...prev[channelId],
+          channelInfo: cached.data,
+          error: null
+        }
+      }));
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/telegram?action=channel_info&channel=${channelId}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(`/api/telegram?action=channel_info&channel=${channelId}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       const data = await response.json();
       
       if (response.ok) {
+        // Cache the successful response
+        telegramCache.set(cacheKey, { data, timestamp: now });
+        
         setChannelData(prev => ({
           ...prev,
           [channelId]: {
@@ -61,18 +92,39 @@ export default function TelegramFeed() {
           }
         }));
       }
-    } catch {
-      setChannelData(prev => ({
-        ...prev,
-        [channelId]: {
-          ...prev[channelId],
-          error: 'Network error fetching channel info'
-        }
-      }));
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Request was aborted due to timeout - hide component
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            error: 'Request timeout'
+          }
+        }));
+      }
     }
   }, []);
 
   const fetchMessages = useCallback(async (channelId: string) => {
+    const cacheKey = `messages-${channelId}-${limit}`;
+    const cached = telegramCache.get(cacheKey);
+    const now = Date.now();
+
+    // Use cached data if it's less than 5 minutes old
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      setChannelData(prev => ({
+        ...prev,
+        [channelId]: {
+          ...prev[channelId],
+          messages: cached.data,
+          error: null,
+          loading: false
+        }
+      }));
+      return;
+    }
+
     try {
       setChannelData(prev => ({
         ...prev,
@@ -82,19 +134,28 @@ export default function TelegramFeed() {
         }
       }));
 
-      const response = await fetch(`/api/telegram?action=messages&channel=${channelId}&limit=${limit}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(`/api/telegram?action=messages&channel=${channelId}&limit=${limit}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       const data = await response.json();
       
       if (response.ok) {
-        // API returns an array directly, not { messages: [...] }
         const messagesArray = Array.isArray(data) ? data : data.messages || [];
         const formattedMessages = messagesArray.map((msg: { id: number; message?: string; date: number; sender?: string; views?: number }) => ({
           id: msg.id,
           text: msg.message || '',
-          date: new Date(msg.date * 1000), // Convert Unix timestamp to Date
+          date: new Date(msg.date * 1000),
           sender: msg.sender || 'Channel',
           views: msg.views || 0
         }));
+
+        // Cache the successful response
+        telegramCache.set(cacheKey, { data: formattedMessages, timestamp: now });
 
         setChannelData(prev => ({
           ...prev,
@@ -115,39 +176,59 @@ export default function TelegramFeed() {
           }
         }));
       }
-    } catch {
-      setChannelData(prev => ({
-        ...prev,
-        [channelId]: {
-          ...prev[channelId],
-          error: 'Network error fetching messages',
-          loading: false
-        }
-      }));
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Request was aborted due to timeout - hide component
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            error: 'Request timeout',
+            loading: false
+          }
+        }));
+      }
     }
   }, [limit]);
 
   const refreshActiveChannel = () => {
-    // Only fetch if not currently loading
+    // Clear cache for this channel and refetch
+    const cacheKeyInfo = `channelInfo-${activeChannel}`;
+    const cacheKeyMessages = `messages-${activeChannel}-${limit}`;
+    telegramCache.delete(cacheKeyInfo);
+    telegramCache.delete(cacheKeyMessages);
+    
     if (!channelData[activeChannel].loading) {
+      fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
   };
 
-  // Fetch data for the active channel, or when the active channel changes
+  // Fetch data only when a channel is viewed for the first time
   useEffect(() => {
     const current = channelData[activeChannel];
-    
-    // Fetch channel info only if it hasn't been fetched yet
-    if (!current.channelInfo && !current.error) {
-      fetchChannelInfo(activeChannel);
-    }
-
-    // Fetch messages only if the list is empty and not currently loading
     if (current.messages.length === 0 && !current.loading && !current.error) {
+      fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
-  }, [activeChannel, limit, fetchChannelInfo, fetchMessages]);
+  }, [activeChannel, fetchChannelInfo, fetchMessages]);
+
+  // Refetch messages only when the limit changes, skipping the initial render
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Clear cache and refetch with new limit
+    const cacheKey = `messages-${activeChannel}-${limit}`;
+    telegramCache.delete(cacheKey);
+    
+    if (!channelData[activeChannel].loading) {
+      fetchMessages(activeChannel);
+    }
+  }, [limit, fetchMessages, activeChannel]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
@@ -218,21 +299,6 @@ export default function TelegramFeed() {
             </svg>
           </button>
         </div>
-      </div>
-
-      {/* Channel Header */}
-      <div className="mb-3">
-        <h2 className="text-lg font-bold text-[#F0F3FA]">
-          {currentChannelData.channelInfo 
-            ? `@${currentChannelData.channelInfo.username}` 
-            : CHANNELS.find(c => c.id === activeChannel)?.name || ''}
-        </h2>
-        {currentChannelData.channelInfo && (
-          <p className="text-xs text-gray-400">
-            {currentChannelData.channelInfo.participantsCount.toLocaleString()} subscribers
-            {currentChannelData.channelInfo.about && ` • ${currentChannelData.channelInfo.about}`}
-          </p>
-        )}
       </div>
 
       {/* Messages */}

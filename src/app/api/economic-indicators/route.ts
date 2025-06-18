@@ -85,7 +85,7 @@ export async function GET() {
         indicators.push({ name: 'CPI Inflation Rate', value: cpiData.value, date: cpiData.date });
     }
     if (unemploymentData) {
-        indicators.push({ name: 'Unemployment Rate (Monthly)', value: unemploymentData.value + '%', date: unemploymentData.date });
+        indicators.push({ name: 'Unemployment Rate', value: unemploymentData.value + '%', date: unemploymentData.date });
     }
 
     return NextResponse.json(indicators);

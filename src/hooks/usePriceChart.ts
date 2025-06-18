@@ -3,6 +3,14 @@ import { createChart, IChartApi, ISeriesApi, UTCTimestamp, LineStyle, Candlestic
 
 type Range = '1D' | '7D' | '1M' | '3M' | '1Y';
 
+// Cache for historical data with 5-minute expiry
+const dataCache = new Map<string, { data: CandlestickData[], timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+// Track active WebSocket to ensure only one connection at a time
+let activeWebSocket: WebSocket | null = null;
+let activeSymbol: string | null = null;
+
 export function usePriceChart(symbol: string, range: Range) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chart = useRef<IChartApi | null>(null);
@@ -68,6 +76,17 @@ export function usePriceChart(symbol: string, range: Range) {
         });
 
         const fetchHistoricalData = async () => {
+            const cacheKey = `${symbol}-${range}`;
+            const cached = dataCache.get(cacheKey);
+            const now = Date.now();
+
+            // Use cached data if it's less than 5 minutes old
+            if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+                series.setData(cached.data);
+                chart.current?.timeScale().fitContent();
+                return;
+            }
+
             const interval = range === '1D' ? '15m' : range === '7D' ? '1h' : '4h';
             const start = new Date();
             if (range === '7D') start.setDate(start.getDate() - 7);
@@ -95,42 +114,86 @@ export function usePriceChart(symbol: string, range: Range) {
                     const candles = data.map(getCandle);
                     series.setData(candles);
                     chart.current?.timeScale().fitContent();
+                    
+                    // Cache the data with current timestamp
+                    dataCache.set(cacheKey, { data: candles, timestamp: now });
                 }
             } catch (error) {
-                console.error('Error fetching historical data:', error);
+                // Silently handle fetch errors
             }
         };
 
         fetchHistoricalData();
 
-        const ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
-        ws.onopen = () => {
-            ws.send(JSON.stringify({
-                method: 'subscribe',
-                subscription: { type: 'l2Book', coin: symbol.toUpperCase() }
-            }));
-        };
-
-        ws.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
-            if (msg.channel === 'l2Book' && msg.data?.levels?.[0]?.[0]) {
-                const price = parseFloat(msg.data.levels[0][0].px);
-                const data = series.data();
-                const lastCandle = data[data.length - 1] as CandlestickData | undefined;
-
-                if (lastCandle) {
-                    series.update({
-                        ...lastCandle,
-                        close: price,
-                        high: Math.max(lastCandle.high, price),
-                        low: Math.min(lastCandle.low, price),
-                    });
-                }
+        // Close existing WebSocket if it's for a different symbol
+        if (activeWebSocket && activeSymbol !== symbol) {
+            if (activeWebSocket.readyState === WebSocket.OPEN) {
+                activeWebSocket.close();
             }
-        };
+            activeWebSocket = null;
+            activeSymbol = null;
+        }
+
+        // Only create WebSocket for this symbol if none exists
+        if (!activeWebSocket || activeSymbol !== symbol) {
+            const ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
+            activeWebSocket = ws;
+            activeSymbol = symbol;
+            
+            ws.onopen = () => {
+                ws.send(JSON.stringify({
+                    method: 'subscribe',
+                    subscription: { type: 'l2Book', coin: symbol.toUpperCase() }
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                // Only process messages if this is still the active symbol
+                if (activeSymbol === symbol) {
+                    const msg = JSON.parse(event.data);
+                    if (msg.channel === 'l2Book' && msg.data?.levels?.[0]?.[0]) {
+                        const price = parseFloat(msg.data.levels[0][0].px);
+                        const data = series.data();
+                        const lastCandle = data[data.length - 1] as CandlestickData | undefined;
+
+                        if (lastCandle) {
+                            series.update({
+                                ...lastCandle,
+                                close: price,
+                                high: Math.max(lastCandle.high, price),
+                                low: Math.min(lastCandle.low, price),
+                            });
+                        }
+                    }
+                }
+            };
+
+            ws.onerror = () => {
+                // Silently handle WebSocket errors to prevent timeout messages
+                if (activeWebSocket === ws) {
+                    activeWebSocket = null;
+                    activeSymbol = null;
+                }
+            };
+
+            ws.onclose = () => {
+                // Silently handle WebSocket closure
+                if (activeWebSocket === ws) {
+                    activeWebSocket = null;
+                    activeSymbol = null;
+                }
+            };
+        }
 
         return () => {
-            ws.close();
+            // Only close if this effect is for the currently active symbol
+            if (activeSymbol === symbol && activeWebSocket) {
+                if (activeWebSocket.readyState === WebSocket.OPEN) {
+                    activeWebSocket.close();
+                }
+                activeWebSocket = null;
+                activeSymbol = null;
+            }
         };
     }, [symbol, range]);
     
