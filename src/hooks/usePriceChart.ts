@@ -11,7 +11,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 let activeWebSocket: WebSocket | null = null;
 let activeSymbol: string | null = null;
 
-export function usePriceChart(symbol: string, range: Range) {
+export function usePriceChart(symbol: string, range: Range, setIsLoading?: (loading: boolean) => void) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chart = useRef<IChartApi | null>(null);
     const candlestickSeries = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -76,6 +76,7 @@ export function usePriceChart(symbol: string, range: Range) {
         });
 
         const fetchHistoricalData = async () => {
+            setIsLoading?.(true);
             const cacheKey = `${symbol}-${range}`;
             const cached = dataCache.get(cacheKey);
             const now = Date.now();
@@ -84,6 +85,7 @@ export function usePriceChart(symbol: string, range: Range) {
             if (cached && (now - cached.timestamp) < CACHE_DURATION) {
                 series.setData(cached.data);
                 chart.current?.timeScale().fitContent();
+                setIsLoading?.(false);
                 return;
             }
 
@@ -120,6 +122,8 @@ export function usePriceChart(symbol: string, range: Range) {
                 }
             } catch {
                 // Silently handle fetch errors
+            } finally {
+                setIsLoading?.(false);
             }
         };
 
@@ -195,7 +199,7 @@ export function usePriceChart(symbol: string, range: Range) {
                 activeSymbol = null;
             }
         };
-    }, [symbol, range]);
+    }, [symbol, range, setIsLoading]);
     
     return chartContainerRef;
 } 

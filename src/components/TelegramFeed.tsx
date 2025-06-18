@@ -30,10 +30,14 @@ const CHANNELS = [
   { id: 'infinityhedge', name: '@infinityhedge', displayName: 'Infinity Hedge' }
 ];
 
-// Cache for Telegram data with 5-minute expiry
+// Cache for Telegram data with longer 15-minute expiry to prevent rate limiting
 const channelInfoCache = new Map<string, { data: ChannelInfo, timestamp: number }>();
 const messagesCache = new Map<string, { data: TelegramMessage[], timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
+// Rate limiting - track last request time per channel
+const lastRequestTime = new Map<string, number>();
+const MIN_REQUEST_INTERVAL = 10000; // 10 seconds minimum between requests
 
 export default function TelegramFeed() {
   const [activeChannel, setActiveChannel] = useState('mlmonchain');
@@ -48,7 +52,7 @@ export default function TelegramFeed() {
     const cached = channelInfoCache.get(cacheKey);
     const now = Date.now();
 
-    // Use cached data if it's less than 5 minutes old
+    // Use cached data if it's less than 15 minutes old
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
       setChannelData(prev => ({
         ...prev,
@@ -61,9 +65,16 @@ export default function TelegramFeed() {
       return;
     }
 
+    // Rate limiting - check if we've made a request too recently
+    const lastRequest = lastRequestTime.get(`channelInfo-${channelId}`) || 0;
+    if (now - lastRequest < MIN_REQUEST_INTERVAL) {
+      return; // Skip this request to avoid rate limiting
+    }
+    lastRequestTime.set(`channelInfo-${channelId}`, now);
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`/api/telegram?action=channel_info&channel=${channelId}`, {
         signal: controller.signal
@@ -103,6 +114,15 @@ export default function TelegramFeed() {
             error: 'Request timeout'
           }
         }));
+      } else {
+        // Other errors - hide component
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            error: 'Service unavailable'
+          }
+        }));
       }
     }
   }, []);
@@ -112,7 +132,7 @@ export default function TelegramFeed() {
     const cached = messagesCache.get(cacheKey);
     const now = Date.now();
 
-    // Use cached data if it's less than 5 minutes old
+    // Use cached data if it's less than 15 minutes old
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
       setChannelData(prev => ({
         ...prev,
@@ -126,6 +146,13 @@ export default function TelegramFeed() {
       return;
     }
 
+    // Rate limiting - check if we've made a request too recently
+    const lastRequest = lastRequestTime.get(`messages-${channelId}`) || 0;
+    if (now - lastRequest < MIN_REQUEST_INTERVAL) {
+      return; // Skip this request to avoid rate limiting
+    }
+    lastRequestTime.set(`messages-${channelId}`, now);
+
     try {
       setChannelData(prev => ({
         ...prev,
@@ -136,7 +163,7 @@ export default function TelegramFeed() {
       }));
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`/api/telegram?action=messages&channel=${channelId}&limit=${limit}`, {
         signal: controller.signal
@@ -188,48 +215,123 @@ export default function TelegramFeed() {
             loading: false
           }
         }));
+      } else {
+        // Other errors - hide component
+        setChannelData(prev => ({
+          ...prev,
+          [channelId]: {
+            ...prev[channelId],
+            error: 'Service unavailable',
+            loading: false
+          }
+        }));
       }
     }
   }, [limit]);
 
   const refreshActiveChannel = () => {
+    // Check rate limiting before allowing refresh
+    const now = Date.now();
+    const lastRefresh = lastRequestTime.get(`refresh-${activeChannel}`) || 0;
+    if (now - lastRefresh < MIN_REQUEST_INTERVAL) {
+      return; // Prevent spamming refresh button
+    }
+    lastRequestTime.set(`refresh-${activeChannel}`, now);
+
     // Clear cache for this channel and refetch
     const cacheKeyInfo = `channelInfo-${activeChannel}`;
     const cacheKeyMessages = `messages-${activeChannel}-${limit}`;
     channelInfoCache.delete(cacheKeyInfo);
     messagesCache.delete(cacheKeyMessages);
     
-    if (!channelData[activeChannel].loading) {
+    // Clear fetch tracking so we can refetch
+    const fetchKey = `${activeChannel}-${limit}`;
+    hasFetchedRef.current.delete(fetchKey);
+    
+    const current = channelData[activeChannel];
+    if (!current.loading) {
       fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
   };
 
-  // Fetch data only when a channel is viewed for the first time
+  // Fetch data only when a channel is viewed for the first time or has no cached data
+  const hasFetchedRef = useRef<Set<string>>(new Set());
+  
   useEffect(() => {
     const current = channelData[activeChannel];
-    if (current.messages.length === 0 && !current.loading && !current.error) {
+    const now = Date.now();
+    const fetchKey = `${activeChannel}-${limit}`;
+    
+    // Skip if we've already attempted to fetch for this channel/limit combination
+    if (hasFetchedRef.current.has(fetchKey)) {
+      return;
+    }
+    
+    // Check if we have recent cached data first
+    const cacheKeyInfo = `channelInfo-${activeChannel}`;
+    const cacheKeyMessages = `messages-${activeChannel}-${limit}`;
+    const cachedInfo = channelInfoCache.get(cacheKeyInfo);
+    const cachedMessages = messagesCache.get(cacheKeyMessages);
+    
+    const hasRecentCache = (cachedInfo && (now - cachedInfo.timestamp) < CACHE_DURATION) ||
+                          (cachedMessages && (now - cachedMessages.timestamp) < CACHE_DURATION);
+    
+    // Only fetch if no data exists AND no recent cache AND not currently loading AND no errors
+    if (!hasRecentCache && current.messages.length === 0 && !current.loading && !current.error) {
+      hasFetchedRef.current.add(fetchKey);
       fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
-  }, [activeChannel, fetchChannelInfo, fetchMessages, channelData]);
+  }, [activeChannel, limit, fetchChannelInfo, fetchMessages]);
 
   // Refetch messages only when the limit changes, skipping the initial render
   const isInitialMount = useRef(true);
+  const lastLimitRef = useRef(limit);
+  
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      lastLimitRef.current = limit;
       return;
     }
 
-    // Clear cache and refetch with new limit
+    // Only proceed if limit actually changed
+    if (lastLimitRef.current === limit) {
+      return;
+    }
+    lastLimitRef.current = limit;
+
+    // Check if we have recent cached data for this limit
     const cacheKey = `messages-${activeChannel}-${limit}`;
-    messagesCache.delete(cacheKey);
+    const cached = messagesCache.get(cacheKey);
+    const now = Date.now();
     
-    if (!channelData[activeChannel].loading) {
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      // Use cached data instead of fetching
+      setChannelData(prev => ({
+        ...prev,
+        [activeChannel]: {
+          ...prev[activeChannel],
+          messages: cached.data,
+          error: null,
+          loading: false
+        }
+      }));
+      return;
+    }
+
+    // Check rate limiting
+    const lastRequest = lastRequestTime.get(`messages-${activeChannel}`) || 0;
+    if (now - lastRequest < MIN_REQUEST_INTERVAL) {
+      return; // Skip this request to avoid rate limiting
+    }
+    
+    const current = channelData[activeChannel];
+    if (!current.loading) {
       fetchMessages(activeChannel);
     }
-  }, [limit, fetchMessages, activeChannel, channelData]);
+  }, [limit, activeChannel, fetchMessages]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
@@ -245,6 +347,12 @@ export default function TelegramFeed() {
 
   // If there's an error with the current channel, don't show anything
   if (currentChannelData.error) {
+    return null;
+  }
+
+  // If all channels have errors, don't show the component at all
+  const allChannelsHaveErrors = Object.values(channelData).every(data => data.error);
+  if (allChannelsHaveErrors) {
     return null;
   }
 
