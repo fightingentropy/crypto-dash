@@ -38,7 +38,7 @@ export default function TelegramFeed() {
     infinityhedge: { messages: [], channelInfo: null, loading: true, error: null }
   });
 
-  const fetchChannelInfo = async (channelId: string) => {
+  const fetchChannelInfo = useCallback(async (channelId: string) => {
     try {
       const response = await fetch(`/api/telegram?action=channel_info&channel=${channelId}`);
       const data = await response.json();
@@ -70,7 +70,7 @@ export default function TelegramFeed() {
         }
       }));
     }
-  };
+  }, []);
 
   const fetchMessages = useCallback(async (channelId: string) => {
     try {
@@ -137,12 +137,17 @@ export default function TelegramFeed() {
   // Fetch data for the active channel, or when the active channel changes
   useEffect(() => {
     const current = channelData[activeChannel];
-    // Fetch only if it has not been fetched before (i.e., no messages and no error)
-    if (current.messages.length === 0 && !current.error) {
+    
+    // Fetch channel info only if it hasn't been fetched yet
+    if (!current.channelInfo && !current.error) {
       fetchChannelInfo(activeChannel);
+    }
+
+    // Fetch messages only if the list is empty and not currently loading
+    if (current.messages.length === 0 && !current.loading && !current.error) {
       fetchMessages(activeChannel);
     }
-  }, [activeChannel, fetchMessages, channelData]);
+  }, [activeChannel, limit, fetchChannelInfo, fetchMessages]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
