@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import PriceChart from '@/components/PriceChart';
+import dynamic from 'next/dynamic';
+
+const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false });
 import TelegramFeed from '@/components/TelegramFeed';
 import CryptoPrices from '@/components/CryptoPrices';
 import EconomicIndicators from '@/components/EconomicIndicators';
