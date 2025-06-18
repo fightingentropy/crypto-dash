@@ -39,6 +39,8 @@ TELEGRAM_API_ID=your_api_id_here
 TELEGRAM_API_HASH=your_api_hash_here
 TELEGRAM_PHONE=+1234567890
 TELEGRAM_SESSION=your_session_string_here
+# Etherscan API (for Ethereum transaction volume)
+ETHERSCAN_API_KEY=your_etherscan_api_key
 ```
 
 ### Telegram Setup

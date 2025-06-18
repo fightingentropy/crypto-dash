@@ -30,7 +30,7 @@ export default function EconomicIndicators() {
         if (response.ok) {
           setIndicators(data);
         }
-      } catch (error) {
+      } catch {
         // Silently handle errors - keep console clean
         // Keep existing data if fetch fails
       } finally {

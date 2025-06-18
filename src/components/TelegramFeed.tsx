@@ -283,6 +283,7 @@ export default function TelegramFeed() {
       fetchChannelInfo(activeChannel);
       fetchMessages(activeChannel);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannel, limit, fetchChannelInfo, fetchMessages]);
 
   // Refetch messages only when the limit changes, skipping the initial render
@@ -331,6 +332,7 @@ export default function TelegramFeed() {
     if (!current.loading) {
       fetchMessages(activeChannel);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit, activeChannel, fetchMessages]);
 
   const formatDate = (date: Date) => {
