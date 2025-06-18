@@ -14,6 +14,10 @@ interface AssetContext {
     funding: string;
 }
 
+interface Meta {
+    universe: { name: string }[];
+}
+
 const SYMBOLS = ['BTC', 'ETH', 'HYPE', 'SOL', 'FARTCOIN', 'XRP', 'SUI', 'kPEPE', 'SPX', 'AAVE'];
 
 export async function GET() {
@@ -30,13 +34,13 @@ export async function GET() {
     }
 
     const data = await response.json();
-    const [meta, assetCtxs]: [any, AssetContext[]] = data;
+    const [meta, assetCtxs]: [Meta, AssetContext[]] = data;
     
     const assets: Asset[] = [];
 
     if (meta.universe && assetCtxs) {
         const universe = meta.universe;
-        const assetCtxMap = new Map(universe.map((u: {name: string}, i: number) => [u.name, assetCtxs[i]]));
+        const assetCtxMap = new Map(universe.map((u, i) => [u.name, assetCtxs[i]]));
         
         for (const symbol of SYMBOLS) {
             const assetData: Partial<AssetContext> = assetCtxMap.get(symbol) || {};
