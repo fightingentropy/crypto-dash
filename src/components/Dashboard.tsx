@@ -6,6 +6,7 @@ import TelegramFeed from '@/components/TelegramFeed';
 import CryptoPrices from '@/components/CryptoPrices';
 import EconomicIndicators from '@/components/EconomicIndicators';
 import ThemeToggle from '@/components/ThemeToggle';
+import EthTxVolumeChart from '@/components/EthTxVolumeChart';
 
 export default function Dashboard() {
     const [symbol, setSymbol] = useState('HYPE');
@@ -24,6 +25,7 @@ export default function Dashboard() {
                     <div className="space-y-8">
                         <CryptoPrices onSymbolClick={setSymbol} />
                         <EconomicIndicators />
+                        <EthTxVolumeChart />
                     </div>
                     {/* Right Column */}
                     <div className="space-y-8">

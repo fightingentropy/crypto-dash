@@ -51,7 +51,7 @@ export default function CryptoPrices({ onSymbolClick }: CryptoPricesProps) {
             document.title = `$${hype.price.toFixed(2)} HYPE - Crypto Dashboard`;
           }
         }
-      } catch (error) {
+      } catch {
         // Silently handle errors - don't log to console to keep it clean
         // Keep existing data if fetch fails
       } finally {
