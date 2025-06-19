@@ -63,6 +63,34 @@ export default function CryptoPrices({ onSymbolClick }: CryptoPricesProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Separate effect for updating tab title with HYPE price every 5 seconds
+  useEffect(() => {
+    const updateTabTitle = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch('/api/market-data', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        if (response.ok) {
+          const hype = data.find((a: Asset) => a.name === 'HYPE');
+          if (hype) {
+            document.title = `$${hype.price.toFixed(2)} HYPE - Crypto Dashboard`;
+          }
+        }
+      } catch {
+        // Silently handle errors - don't log to console to keep it clean
+      }
+    };
+    
+    const titleInterval = setInterval(updateTabTitle, 5000); // Update tab title every 5 seconds
+    return () => clearInterval(titleInterval);
+  }, []);
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors">
       <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Crypto Prices</h2>
