@@ -27,8 +27,8 @@ export default function Dashboard() {
                     {/* Left Column */}
                     <div className="space-y-8">
                         <CryptoPrices onSymbolClick={setSymbol} />
-                        <EconomicIndicators />
                         <M2Chart />
+                        <EconomicIndicators />
                     </div>
                     {/* Right Column */}
                     <div className="space-y-8">
