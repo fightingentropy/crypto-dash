@@ -18,7 +18,7 @@ interface Meta {
     universe: { name: string }[];
 }
 
-const SYMBOLS = ['BTC', 'ETH', 'HYPE', 'SOL', 'FARTCOIN', 'XRP', 'SUI', 'kPEPE', 'SPX', 'AAVE'];
+const SYMBOLS = ['BTC', 'ETH', 'HYPE', 'SOL', 'FARTCOIN', 'XRP', 'SUI', 'SPX', 'AAVE'];
 
 export async function GET() {
   try {
