@@ -4,6 +4,8 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
 const PriceChart = dynamic(() => import('@/components/PriceChart'), { ssr: false });
+const M2Chart = dynamic(() => import('@/components/M2Chart'), { ssr: false });
+const MoneyMarketFundsChart = dynamic(() => import('@/components/MoneyMarketFundsChart'), { ssr: false });
 import TelegramFeed from '@/components/TelegramFeed';
 import CryptoPrices from '@/components/CryptoPrices';
 import EconomicIndicators from '@/components/EconomicIndicators';
@@ -26,10 +28,12 @@ export default function Dashboard() {
                     <div className="space-y-8">
                         <CryptoPrices onSymbolClick={setSymbol} />
                         <EconomicIndicators />
+                        <M2Chart />
                     </div>
                     {/* Right Column */}
                     <div className="space-y-8">
                         <PriceChart symbol={symbol} />
+                        <MoneyMarketFundsChart />
                         <TelegramFeed />
                     </div>
                 </div>
