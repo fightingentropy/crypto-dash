@@ -156,7 +156,7 @@ export default function M2Chart() {
             if (cachedData.timestamp && (now - cachedData.timestamp) < ONE_DAY) {
               // Use cached data
               setM2Data(cachedData.data);
-              const chartData: LineData[] = cachedData.data.data.map((point: any) => ({
+                             const chartData: LineData[] = cachedData.data.data.map((point: M2DataPoint) => ({
                 time: (new Date(point.date).getTime() / 1000) as UTCTimestamp,
                 value: point.value,
               }));
@@ -194,7 +194,7 @@ export default function M2Chart() {
 
         lineSeries.current!.setData(chartData);
         chart.current!.timeScale().fitContent();
-      } catch (error) {
+      } catch {
         // Silently handle errors to keep console clean
       } finally {
         setIsLoading(false);

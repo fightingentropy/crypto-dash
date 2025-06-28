@@ -155,7 +155,7 @@ export default function MoneyMarketFundsChart() {
             if (cachedData.timestamp && (now - cachedData.timestamp) < ONE_DAY) {
               // Use cached data
               setMMFData(cachedData.data);
-              const chartData: LineData[] = cachedData.data.data.map((point: any) => ({
+                             const chartData: LineData[] = cachedData.data.data.map((point: MMFDataPoint) => ({
                 time: (new Date(point.date).getTime() / 1000) as UTCTimestamp,
                 value: point.value,
               }));
@@ -193,7 +193,7 @@ export default function MoneyMarketFundsChart() {
 
         lineSeries.current!.setData(chartData);
         chart.current!.timeScale().fitContent();
-      } catch (error) {
+      } catch {
         // Silently handle errors to keep console clean
       } finally {
         setIsLoading(false);

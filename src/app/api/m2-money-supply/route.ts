@@ -34,8 +34,8 @@ async function fetchM2Data(years: number = 5): Promise<M2DataPoint[]> {
   const observations = data.observations || [];
 
   return observations
-    .filter((obs: any) => obs.value !== '.' && !isNaN(parseFloat(obs.value)))
-    .map((obs: any) => ({
+    .filter((obs: { value: string; date: string }) => obs.value !== '.' && !isNaN(parseFloat(obs.value)))
+    .map((obs: { value: string; date: string }) => ({
       date: obs.date,
       value: parseFloat(obs.value)
     }));
